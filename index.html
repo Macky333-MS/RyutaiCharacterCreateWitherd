@@ -3,210 +3,174 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#000000" />
+  <meta name="theme-color" content="#111318" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black" />
-  <title>龍体文字作成 Web Prototype</title>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>龍体文字作成 Web V3 Prototype</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <div id="app" class="app-shell">
     <main>
-      <!-- HOME -->
       <section id="homeView" class="screen active home-screen" aria-label="ホーム">
         <div class="home-inner">
-          <h1>龍体文字作成</h1>
-          <p class="home-sub">Unity版の画面構成を保ったWeb試作品</p>
-          <div class="home-actions">
-            <button id="startCreate" class="big-button" type="button">龍体文字を作る</button>
-            <button id="openHistory" class="big-button" type="button">保存データを見る</button>
+          <div class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 64 64"><path d="M19 15h26v8H29v7h14v8H29v11h16v8H19V15Z"/></svg>
           </div>
-          <p class="local-note">履歴はこの端末・このブラウザ内に保存されます。</p>
+          <p class="eyebrow">RYUTAI CREATOR</p>
+          <h1>龍体文字を、<br class="mobile-break">かんたんに。</h1>
+          <p class="home-sub">画面の案内に沿って、文字・色・形を順番に選ぶだけ。</p>
+          <div class="home-actions">
+            <button id="startCreate" class="primary-action" type="button">
+              <span class="action-icon" aria-hidden="true">＋</span><span>新しく作る</span><span class="action-arrow" aria-hidden="true">→</span>
+            </button>
+            <button id="openHistory" class="secondary-action" type="button">
+              <span class="action-icon" aria-hidden="true">▦</span><span>保存データを見る</span><span class="action-arrow" aria-hidden="true">→</span>
+            </button>
+          </div>
+          <div class="local-note"><span aria-hidden="true">◉</span><span>作品データはこの端末内に保存されます</span></div>
         </div>
       </section>
 
-      <!-- CREATE WIZARD -->
       <section id="createView" class="screen wizard-screen" aria-label="龍体文字作成">
         <div class="wizard-frame">
+          <header class="wizard-topbar">
+            <button class="topbar-home" id="wizardHomeButton" type="button" aria-label="作成を終了してホームへ戻る">×</button>
+            <div class="progress-wrap" aria-label="作成進捗">
+              <div class="progress-track"><div id="progressFill" class="progress-fill"></div></div>
+              <span id="progressText" class="progress-text">1 / 7</span>
+            </div>
+          </header>
+
           <div class="step-page active" data-step="1">
-            <div class="step-content step1-layout">
-              <h2>項目名を入力してください</h2>
-              <input id="itemName" class="large-input" type="text" maxlength="100" placeholder="Enter text..." />
+            <div class="step-content focused-step">
+              <div class="hero-icon icon-note" aria-hidden="true">
+                <svg viewBox="0 0 64 64"><path d="M16 10h25l8 8v36H16V10Zm8 10v5h17v-5H24Zm0 11v5h17v-5H24Zm0 11v5h12v-5H24Z"/><path d="M41 10v10h10" fill="none" stroke="currentColor" stroke-width="4"/></svg>
+              </div>
+              <div class="step-copy">
+                <p class="step-kicker">STEP 1</p>
+                <h2>項目名を入力</h2>
+                <p>履歴から見つけやすい名前を付けます。あとから変更できます。</p>
+              </div>
+              <label class="field-card" for="itemName">
+                <span class="field-label">項目名</span>
+                <input id="itemName" class="large-input" type="text" maxlength="100" placeholder="例：学業成就" />
+              </label>
             </div>
-            <div class="wizard-footer">
-              <button id="exitCreate1" class="nav-button" type="button">終了</button>
-              <div></div>
-              <button class="nav-button next-button" data-next="2" type="button">次へ</button>
-            </div>
+            <div class="wizard-footer"><button id="exitCreate1" class="ghost-nav" type="button">終了</button><div></div><button class="primary-nav next-button" data-next="2" type="button">次へ <span>→</span></button></div>
           </div>
 
           <div class="step-page" data-step="2">
-            <div class="top-strip">
-              <div id="nameStrip2" class="name-strip">項目名：</div>
-              <button class="small-button show-full-name" type="button">全文表示</button>
+            <div class="step-content wide-step">
+              <div class="compact-name-row"><div id="nameStrip2" class="name-strip">項目名：</div><button class="text-link show-full-name" type="button">全文表示</button></div>
+              <div class="step-heading-row">
+                <div class="hero-icon small icon-settings" aria-hidden="true"><svg viewBox="0 0 64 64"><path d="M14 18h36M14 32h36M14 46h36" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/><circle cx="24" cy="18" r="5"/><circle cx="42" cy="32" r="5"/><circle cx="29" cy="46" r="5"/></svg></div>
+                <div><p class="step-kicker">STEP 2</p><h2>作り方を決める</h2><p>色・文字数・作成モードを設定します。</p></div>
+              </div>
+              <div class="settings-grid">
+                <section class="setting-card selectable-card">
+                  <div class="card-icon">🎨</div><h3>カラー</h3><p>文字ごとに色を付けます。</p>
+                  <button id="colorToggle" class="switch-control selected" type="button" aria-pressed="true"><span class="switch-knob"></span><span class="switch-label">ON</span></button>
+                </section>
+                <section class="setting-card count-card">
+                  <div class="card-icon">123</div><h3>文字数</h3><p>最大20文字まで選べます。</p>
+                  <div class="number-stepper"><button id="countDown" type="button" aria-label="1文字減らす">−</button><div id="countDisplay" class="count-display">0</div><button id="countUp" type="button" aria-label="1文字増やす">＋</button></div>
+                </section>
+                <section class="setting-card mode-card">
+                  <div class="card-title-row"><div class="card-icon">✦</div><button id="modeHelp" class="help-button" type="button" aria-label="作成モードの説明">?</button></div><h3>作成モード</h3><p>通常または1文字で作成します。</p>
+                  <div class="segmented-control"><label><input type="radio" name="mode" value="normal" checked><span>通常</span></label><label><input type="radio" name="mode" value="single"><span>1文字</span></label></div>
+                </section>
+              </div>
+              <button id="resonanceButton" class="quiet-feature" type="button"><span>⌁</span> 共鳴練習について</button>
             </div>
-            <div class="settings-grid">
-              <section class="setting-card">
-                <h3>カラーの龍体文字を作ることはできますか？</h3>
-                <p>黄色：選択状態<br>白色：非選択状態</p>
-                <button id="colorToggle" class="square-toggle selected" type="button" aria-pressed="true"><span></span></button>
-              </section>
-              <section class="setting-card count-card">
-                <h3>カラーの龍体文字で作ると何文字になりますか？<br><small>（最大20文字まで）</small></h3>
-                <div id="countDisplay" class="count-display">0</div>
-                <div class="count-controls">
-                  <button id="countUp" type="button">UP</button>
-                  <button id="countDown" type="button">DOWN</button>
-                </div>
-              </section>
-              <section class="setting-card">
-                <h3>作成モード</h3>
-                <button id="modeHelp" class="help-button" type="button">?</button>
-                <label class="mode-option"><input type="radio" name="mode" value="normal" checked><span class="mode-box mode-yellow"></span>通常</label>
-                <label class="mode-option"><input type="radio" name="mode" value="single"><span class="mode-box"></span>1文字</label>
-              </section>
-            </div>
-            <div class="bottom-command-bar">
-              <button class="nav-button" data-prev="1" type="button">戻る</button>
-              <button id="resonanceButton" class="center-command" type="button">共 鳴 練 習</button>
-              <button class="nav-button next-button" data-next="3" type="button">次へ</button>
-            </div>
+            <div class="wizard-footer"><button class="ghost-nav" data-prev="1" type="button">← 戻る</button><div></div><button class="primary-nav next-button" data-next="3" type="button">次へ <span>→</span></button></div>
           </div>
 
           <div class="step-page" data-step="3">
-            <div class="top-strip transparent-strip">
-              <div id="nameStrip3" class="name-strip">項目名：</div>
-              <button class="small-button show-full-name" type="button">全文表示</button>
+            <div class="step-content wide-step">
+              <div class="compact-name-row"><div id="nameStrip3" class="name-strip">項目名：</div><button class="text-link show-full-name" type="button">全文表示</button></div>
+              <div class="step-heading-row"><div class="hero-icon small icon-letters" aria-hidden="true">あ</div><div><p class="step-kicker">STEP 3</p><h2>1〜10文字目を選ぶ</h2><p>使用文字数：<strong><span id="usedCount1">0</span>文字</strong></p></div></div>
+              <div id="slots1" class="character-slots ten-slots"></div>
+              <div class="character-actions"><button id="openPicker1" class="secondary-nav" type="button">＋ 文字を選択</button><button id="toggleAlias1" class="ghost-action" type="button">仮名表示</button><button id="clearSlots1" class="ghost-action danger-soft" type="button">クリア</button></div>
             </div>
-            <h2 class="character-heading">使用文字数：<span id="usedCount1">0</span>文字（1から10文字目）</h2>
-            <div id="slots1" class="character-slots ten-slots"></div>
-            <div class="character-actions">
-              <button id="openPicker1" class="mid-button" type="button">文字選択</button>
-              <button id="toggleAlias1" class="mid-button" type="button">仮名表示</button>
-              <button id="clearSlots1" class="mid-button" type="button">CLR</button>
-            </div>
-            <div class="simple-footer">
-              <button class="nav-button" data-prev="2" type="button">戻る</button>
-              <button class="nav-button next-button" data-next="4" type="button">次へ</button>
-            </div>
+            <div class="wizard-footer"><button class="ghost-nav" data-prev="2" type="button">← 戻る</button><div></div><button class="primary-nav next-button" data-next="4" type="button">次へ <span>→</span></button></div>
           </div>
 
           <div class="step-page" data-step="4">
-            <div class="top-strip transparent-strip">
-              <div id="nameStrip4" class="name-strip">項目名：</div>
-              <button class="small-button show-full-name" type="button">全文表示</button>
+            <div class="step-content wide-step">
+              <div class="compact-name-row"><div id="nameStrip4" class="name-strip">項目名：</div><button class="text-link show-full-name" type="button">全文表示</button></div>
+              <div class="step-heading-row"><div class="hero-icon small icon-letters" aria-hidden="true">字</div><div><p class="step-kicker">STEP 4</p><h2>11〜20文字目を選ぶ</h2><p>使用文字数：<strong><span id="usedCount2">0</span>文字</strong></p></div></div>
+              <div id="slots2" class="character-slots ten-slots"></div>
+              <div class="character-actions"><button id="openPicker2" class="secondary-nav" type="button">＋ 文字を選択</button><button id="toggleAlias2" class="ghost-action" type="button">仮名表示</button><button id="clearSlots2" class="ghost-action danger-soft" type="button">クリア</button></div>
             </div>
-            <h2 class="character-heading">使用文字数：<span id="usedCount2">0</span>文字（11から20文字目）</h2>
-            <div id="slots2" class="character-slots ten-slots"></div>
-            <div class="character-actions">
-              <button id="openPicker2" class="mid-button" type="button">文字選択</button>
-              <button id="toggleAlias2" class="mid-button" type="button">仮名表示</button>
-              <button id="clearSlots2" class="mid-button" type="button">CLR</button>
-            </div>
-            <div class="simple-footer">
-              <button class="nav-button" data-prev="3" type="button">戻る</button>
-              <button class="nav-button next-button" data-next="5" type="button">次へ</button>
-            </div>
+            <div class="wizard-footer"><button class="ghost-nav" data-prev="3" type="button">← 戻る</button><div></div><button class="primary-nav next-button" data-next="5" type="button">次へ <span>→</span></button></div>
           </div>
 
           <div class="step-page" data-step="5">
-            <h2 class="center-title">色の選択</h2>
-            <div class="palette-choice-list">
-              <button class="palette-choice selected" data-palette="10" type="button"><strong>10色</strong><span>黒色、水色、黄緑色、緑色、黄色、だいだい色、ピンク色、赤色、紫色、青色</span></button>
-              <button class="palette-choice" data-palette="12" type="button"><strong>12色</strong><span>10色＋茶色、薄だいだい色</span></button>
-              <button class="palette-choice" data-palette="24" type="button"><strong>24色</strong><span>12色＋山吹色、黄土色、深緑色、群青色、すみれ色、赤紫色、朱色、こげ茶色、ねずみ色、白色、銀色、金色</span></button>
+            <div class="step-content focused-step palette-step">
+              <div class="hero-icon icon-palette" aria-hidden="true">◒</div>
+              <div class="step-copy"><p class="step-kicker">STEP 5</p><h2>色の種類を選ぶ</h2><p>使いたい色の幅に合わせて、カラーパレットを選択します。</p></div>
+              <div class="palette-choice-list">
+                <button class="palette-choice selected" data-palette="10" type="button"><span class="choice-check">✓</span><span class="choice-main"><strong>10色</strong><small>基本的なカラー</small></span><span class="palette-preview ten"></span></button>
+                <button class="palette-choice" data-palette="12" type="button"><span class="choice-check">✓</span><span class="choice-main"><strong>12色</strong><small>茶色・薄だいだい色を追加</small></span><span class="palette-preview twelve"></span></button>
+                <button class="palette-choice" data-palette="24" type="button"><span class="choice-check">✓</span><span class="choice-main"><strong>24色</strong><small>細かな色表現に対応</small></span><span class="palette-preview twentyfour"></span></button>
+              </div>
             </div>
-            <div class="simple-footer">
-              <button class="nav-button" data-prev="4" type="button">戻る</button>
-              <button class="nav-button next-button" data-next="6" type="button">次へ</button>
-            </div>
+            <div class="wizard-footer"><button class="ghost-nav" data-prev="4" type="button">← 戻る</button><div></div><button class="primary-nav next-button" data-next="6" type="button">次へ <span>→</span></button></div>
           </div>
 
           <div class="step-page" data-step="6">
-            <div class="color-step-wrap">
-              <div id="paletteColors" class="palette-colors"></div>
+            <div class="step-content focused-step color-step">
+              <div class="hero-icon icon-color" aria-hidden="true">●</div>
+              <div class="step-copy"><p class="step-kicker">STEP 6</p><h2>色を選択</h2><p>選択中の文字に使う色を選びます。</p></div>
               <div id="selectedColorLabel" class="selected-color-label">選択中：黒色</div>
+              <div id="paletteColors" class="palette-colors"></div>
             </div>
-            <div class="simple-footer">
-              <button class="nav-button" data-prev="5" type="button">戻る</button>
-              <button class="nav-button next-button" data-next="7" type="button">次へ</button>
-            </div>
+            <div class="wizard-footer"><button class="ghost-nav" data-prev="5" type="button">← 戻る</button><div></div><button class="primary-nav next-button" data-next="7" type="button">次へ <span>→</span></button></div>
           </div>
 
           <div class="step-page" data-step="7">
-            <div class="top-strip transparent-strip">
-              <div id="nameStrip7" class="name-strip large-name">項目名：</div>
-              <button class="small-button show-full-name" type="button">全文表示</button>
-            </div>
-            <div class="result-summary">龍体文字（文字数：<span id="finalCount">0</span>）</div>
-            <div id="finalCharacters" class="final-character-line"></div>
-            <div class="shape-block">
-              <h2>形状</h2>
+            <div class="step-content wide-step">
+              <div class="compact-name-row"><div id="nameStrip7" class="name-strip">項目名：</div><button class="text-link show-full-name" type="button">全文表示</button></div>
+              <div class="step-heading-row"><div class="hero-icon small icon-shape" aria-hidden="true">⌁</div><div><p class="step-kicker">STEP 7</p><h2>形を選んで完成</h2><p>龍体文字 <strong>（<span id="finalCount">0</span>文字）</strong></p></div></div>
+              <div id="finalCharacters" class="final-character-line"></div>
               <div class="shape-buttons">
-                <button class="shape-button selected" data-layout="line" type="button">直線</button>
-                <button class="shape-button" data-layout="right" type="button">右回り</button>
-                <button class="shape-button" data-layout="left" type="button">左回り</button>
+                <button class="shape-button selected" data-layout="line" type="button"><span class="shape-preview line"><i></i><i></i><i></i><i></i></span><strong>直線</strong><small>横一列に並べる</small><span class="shape-check">✓</span></button>
+                <button class="shape-button" data-layout="right" type="button"><span class="shape-preview curve right"><i></i><i></i><i></i><i></i></span><strong>右回り</strong><small>右方向へ弧を描く</small><span class="shape-check">✓</span></button>
+                <button class="shape-button" data-layout="left" type="button"><span class="shape-preview curve left"><i></i><i></i><i></i><i></i></span><strong>左回り</strong><small>左方向へ弧を描く</small><span class="shape-check">✓</span></button>
               </div>
+              <button id="previewButton" class="preview-action" type="button">プレビューを見る</button>
             </div>
-            <div class="step7-footer">
-              <button class="nav-button" data-prev="6" type="button">戻る</button>
-              <button id="previewButton" class="nav-button" type="button">確認</button>
-              <button id="finishButton" class="nav-button next-button" type="button">次へ</button>
-            </div>
+            <div class="wizard-footer"><button class="ghost-nav" data-prev="6" type="button">← 戻る</button><div></div><button id="finishButton" class="primary-nav" type="button">完成する <span>✓</span></button></div>
           </div>
 
           <div id="stepIndicator" class="step-indicator">1/7</div>
         </div>
       </section>
 
-      <!-- HISTORY -->
       <section id="historyView" class="screen history-screen" aria-label="保存データ一覧">
-        <div class="history-layout">
-          <section class="history-pane list-pane">
-            <header>保存データ一覧</header>
-            <div class="history-filter-row">
-              <button id="showAllHistory" class="mini-tab active" type="button">すべて</button>
-              <button id="showFavoritesHistory" class="mini-tab" type="button">★ お気に入り</button>
-            </div>
-            <div id="historyList" class="history-list"></div>
-          </section>
-          <section class="history-pane detail-pane">
-            <header>詳細表示</header>
-            <div id="historyDetail" class="history-detail empty-detail">左の保存データを選択してください。</div>
-            <div id="historyActions" class="history-actions hidden">
-              <button id="favoriteHistory" type="button">☆ お気に入り</button>
-              <button id="editHistory" type="button">再編集</button>
-              <button id="duplicateHistory" type="button">複製</button>
-              <button id="saveImageHistory" type="button">画像保存</button>
-              <button id="deleteHistory" type="button">削除</button>
-            </div>
-            <button id="historyMenuButton" class="menu-button" type="button">メニュー</button>
-          </section>
+        <div class="history-shell">
+          <header class="history-topbar"><div><p class="eyebrow">LOCAL LIBRARY</p><h1>保存データ</h1></div><button id="historyMenuButton" class="topbar-home history-close" type="button">×</button></header>
+          <div class="history-layout">
+            <section class="history-pane list-pane">
+              <div class="pane-heading"><h2>作品一覧</h2><div class="history-filter-row"><button id="showAllHistory" class="mini-tab active" type="button">すべて</button><button id="showFavoritesHistory" class="mini-tab" type="button">★ お気に入り</button></div></div>
+              <div id="historyList" class="history-list"></div>
+            </section>
+            <section class="history-pane detail-pane">
+              <div class="pane-heading detail-heading"><button id="historyBackList" class="mobile-back-list" type="button">← 一覧</button><h2>詳細</h2></div>
+              <div id="historyDetail" class="history-detail empty-detail">左の作品を選択すると、ここに詳細が表示されます。</div>
+              <div id="historyActions" class="history-actions hidden"><button id="favoriteHistory" type="button">☆ お気に入り</button><button id="editHistory" type="button">再編集</button><button id="duplicateHistory" type="button">複製</button><button id="saveImageHistory" type="button">画像保存</button><button id="deleteHistory" class="danger-action" type="button">削除</button></div>
+            </section>
+          </div>
         </div>
       </section>
     </main>
   </div>
 
-  <!-- DIALOGS -->
-  <dialog id="messageDialog" class="app-dialog">
-    <h3 id="dialogTitle">確認</h3>
-    <p id="dialogMessage"></p>
-    <div id="dialogButtons" class="dialog-buttons"></div>
-  </dialog>
-
-  <dialog id="pickerDialog" class="app-dialog picker-dialog">
-    <h3 id="pickerTitle">文字選択</h3>
-    <div id="kanaGrid" class="kana-grid"></div>
-    <div class="dialog-buttons"><button id="closePicker" type="button">閉じる</button></div>
-  </dialog>
-
-  <dialog id="previewDialog" class="app-dialog preview-dialog">
-    <h3>完成イメージ</h3>
-    <div id="previewCanvas" class="preview-canvas"></div>
-    <div class="dialog-buttons"><button id="closePreview" type="button">閉じる</button></div>
-  </dialog>
-
+  <dialog id="messageDialog" class="app-dialog"><h3 id="dialogTitle">確認</h3><p id="dialogMessage"></p><div id="dialogButtons" class="dialog-buttons"></div></dialog>
+  <dialog id="pickerDialog" class="app-dialog picker-dialog"><h3 id="pickerTitle">文字選択</h3><p class="dialog-sub">使用する文字をタップしてください。</p><div id="kanaGrid" class="kana-grid"></div><div class="dialog-buttons"><button id="closePicker" type="button">閉じる</button></div></dialog>
+  <dialog id="previewDialog" class="app-dialog preview-dialog"><h3>完成イメージ</h3><div id="previewCanvas" class="preview-canvas"></div><div class="dialog-buttons"><button id="closePreview" type="button">閉じる</button></div></dialog>
   <canvas id="exportCanvas" width="1200" height="1200" hidden></canvas>
   <script src="app.js"></script>
 </body>

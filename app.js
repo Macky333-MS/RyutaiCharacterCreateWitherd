@@ -47,7 +47,12 @@
     currentStep = Math.max(1, Math.min(7, step));
     qa('.step-page').forEach(p => p.classList.toggle('active', Number(p.dataset.step) === currentStep));
     $('stepIndicator').textContent = `${currentStep}/7`;
+    const progressText = $('progressText');
+    const progressFill = $('progressFill');
+    if (progressText) progressText.textContent = `${currentStep} / 7`;
+    if (progressFill) progressFill.style.width = `${(currentStep / 7) * 100}%`;
     renderAll();
+    window.scrollTo({top:0, behavior:'auto'});
   }
 
   function nameText() { return state.itemName.trim() || '未入力'; }
@@ -64,6 +69,8 @@
     updateNameStrips();
     $('colorToggle').classList.toggle('selected', state.useColor);
     $('colorToggle').setAttribute('aria-pressed', String(state.useColor));
+    const switchLabel = $('colorToggle').querySelector('.switch-label');
+    if (switchLabel) switchLabel.textContent = state.useColor ? 'ON' : 'OFF';
     qa('input[name="mode"]').forEach(r => r.checked = r.value === state.mode);
     qa('.palette-choice').forEach(b => b.classList.toggle('selected', Number(b.dataset.palette) === state.palette));
     qa('.shape-button').forEach(b => b.classList.toggle('selected', b.dataset.layout === state.layout));
@@ -86,7 +93,7 @@
       const n = document.createElement('small'); n.textContent = String(i+1);
       const t = document.createElement('span');
       t.textContent = state.characters[i] || '';
-      t.style.color = state.useColor ? state.colors[i] : '#000';
+      t.style.color = state.useColor ? state.colors[i] : '#fff';
       b.append(n,t);
       b.disabled = i >= state.count;
       b.style.opacity = i >= state.count ? '.45' : '1';
@@ -280,6 +287,7 @@
     qa('[data-next]').forEach(b=>b.addEventListener('click',()=>{ if(validateStep(Number(b.closest('.step-page').dataset.step))) showStep(Number(b.dataset.next)); }));
     qa('[data-prev]').forEach(b=>b.addEventListener('click',()=>showStep(Number(b.dataset.prev))));
     $('exitCreate1').addEventListener('click',()=>showDialog('終了確認','龍体文字作成を終了しますか？\n未保存の内容は破棄されます。',[{label:'キャンセル'},{label:'終了',action:()=>showView('homeView')} ]));
+    const wizardHome=$('wizardHomeButton'); if(wizardHome) wizardHome.addEventListener('click',()=>showDialog('終了確認','龍体文字作成を終了しますか？\n未保存の内容は破棄されます。',[{label:'キャンセル'},{label:'終了',action:()=>showView('homeView')} ]));
     qa('.show-full-name').forEach(b=>b.addEventListener('click',()=>showDialog('項目名',nameText(),[{label:'閉じる'}])));
     $('colorToggle').addEventListener('click',()=>{state.useColor=!state.useColor;renderAll();});
     $('countUp').addEventListener('click',()=>{state.count=Math.min(20,state.count+1);renderAll();});
@@ -300,6 +308,7 @@
     $('closePreview').addEventListener('click',()=>$('previewDialog').close());
     $('finishButton').addEventListener('click',()=>showDialog('保存確認','この内容で完成し、履歴へ保存しますか？',[{label:'戻る'},{label:'保存',action:finishWork}]));
     $('historyMenuButton').addEventListener('click',()=>{document.querySelector('.history-layout').classList.remove('detail-open');showView('homeView');});
+    const historyBackList=$('historyBackList'); if(historyBackList) historyBackList.addEventListener('click',()=>document.querySelector('.history-layout').classList.remove('detail-open'));
     $('showAllHistory').addEventListener('click',async()=>{favoritesOnly=false;$('showAllHistory').classList.add('active');$('showFavoritesHistory').classList.remove('active');await renderHistory();});
     $('showFavoritesHistory').addEventListener('click',async()=>{favoritesOnly=true;$('showFavoritesHistory').classList.add('active');$('showAllHistory').classList.remove('active');await renderHistory();});
     $('favoriteHistory').addEventListener('click',toggleFavorite);

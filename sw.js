@@ -1,4 +1,4 @@
-const CACHE='ryutai-wizard-v1';
+const CACHE='ryutai-wizard-v3';
 const ASSETS=['./','./index.html','./style.css','./app.js','./manifest.webmanifest'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS))));
 self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
