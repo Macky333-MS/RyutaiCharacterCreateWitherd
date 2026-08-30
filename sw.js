@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ryutai-wizard-v3.3';
+const CACHE_NAME = 'ryutai-wizard-v3.4';
 
 const ASSETS = [
   './',

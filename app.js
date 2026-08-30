@@ -1,19 +1,21 @@
 (() => {
   'use strict';
 
+  // V3.4: 文字表には可視の仮名・行名・段名を出さず、龍体文字だけを表示する。
+  // 画面上は一般的な50音表の見た目に合わせ、左から「わ」側 → 「あ」側の順に配置する。
   const GOJUON_COLUMNS = [
-    { label:'あ行', chars:['あ','い','う','え','お'] },
-    { label:'か行', chars:['か','き','く','け','こ'] },
-    { label:'さ行', chars:['さ','し','す','せ','そ'] },
-    { label:'た行', chars:['た','ち','つ','て','と'] },
-    { label:'な行', chars:['な','に','ぬ','ね','の'] },
-    { label:'は行', chars:['は','ひ','ふ','へ','ほ'] },
-    { label:'ま行', chars:['ま','み','む','め','も'] },
-    { label:'や行', chars:['や','','ゆ','','よ'] },
-    { label:'ら行', chars:['ら','り','る','れ','ろ'] },
-    { label:'わ行', chars:['わ','','','','を'] }
+    { chars:['わ','','','','を'] },
+    { chars:['ら','り','る','れ','ろ'] },
+    { chars:['や','','ゆ','','よ'] },
+    { chars:['ま','み','む','め','も'] },
+    { chars:['は','ひ','ふ','へ','ほ'] },
+    { chars:['な','に','ぬ','ね','の'] },
+    { chars:['た','ち','つ','て','と'] },
+    { chars:['さ','し','す','せ','そ'] },
+    { chars:['か','き','く','け','こ'] },
+    { chars:['あ','い','う','え','お'] }
   ];
-  const GOJUON_ROWS = ['あ段','い段','う段','え段','お段'];
+  const GOJUON_ROWS = 5;
   const COLOR_DATA = [
     ['黒色','#000000'],['水色','#00d7df'],['黄緑色','#9acd32'],['緑色','#00ee00'],['黄色','#ffe600'],['だいだい色','#ffa000'],['ピンク色','#efb0bf'],['赤色','#ff1010'],['紫色','#ef00e8'],['青色','#1111ee'],
     ['茶色','#8b5a3c'],['薄だいだい色','#ffd4ae'],['山吹色','#ffbf00'],['黄土色','#bd9e4c'],['深緑色','#006633'],['群青色','#003171'],['すみれ色','#8c66b3'],['赤紫色','#993366'],['朱色','#e24200'],['こげ茶色','#4d331a'],['ねずみ色','#808080'],['白色','#ffffff'],['銀色','#c0c0c0'],['金色','#d9a621']
@@ -39,6 +41,9 @@
   let favoritesOnly = false;
   let singleAwaitingColor = false;
   let db = null;
+  let pickerHighlightRow = null;
+  let pickerHighlightColumn = null;
+  let pickerTraceActive = false;
 
   const $ = id => document.getElementById(id);
   const qa = sel => Array.from(document.querySelectorAll(sel));
@@ -289,6 +294,9 @@
     if (state.count === 0) return;
     selectedSlot = Math.min(Math.max(startIndex,0), state.count-1);
     $('pickerTitle').textContent = `${selectedSlot+1}文字目を選択`;
+    pickerHighlightRow = null;
+    pickerHighlightColumn = null;
+    updatePickerHighlights();
     $('pickerDialog').showModal();
   }
 
@@ -296,68 +304,122 @@
     const grid = $('kanaGrid');
     grid.innerHTML = '';
 
-    const corner = document.createElement('div');
-    corner.className = 'gojuon-corner';
-    corner.textContent = '段 / 行';
-    grid.appendChild(corner);
+    // 左端には各横一列をハイライトする操作ボタンを置く。
+    for (let rowIndex = 0; rowIndex < GOJUON_ROWS; rowIndex++) {
+      grid.appendChild(createHighlightButton('row', rowIndex));
 
-    GOJUON_COLUMNS.forEach(column => {
-      const h = document.createElement('div');
-      h.className = 'gojuon-header';
-      h.textContent = column.label;
-      grid.appendChild(h);
-    });
-
-    GOJUON_ROWS.forEach((rowLabel, rowIndex) => {
-      const row = document.createElement('div');
-      row.className = 'gojuon-row-label';
-      row.textContent = rowLabel;
-      grid.appendChild(row);
-
-      GOJUON_COLUMNS.forEach(column => {
+      GOJUON_COLUMNS.forEach((column, columnIndex) => {
         const kana = column.chars[rowIndex];
         if (!kana) {
           const empty = document.createElement('div');
           empty.className = 'gojuon-empty';
-          empty.setAttribute('aria-hidden','true');
+          empty.dataset.row = String(rowIndex);
+          empty.dataset.column = String(columnIndex);
           grid.appendChild(empty);
           return;
         }
-        grid.appendChild(createKanaButton(kana));
+        grid.appendChild(createKanaButton(kana, rowIndex, columnIndex));
       });
+    }
+
+    // 「ん」は50音表本体と混同しないよう、独立した龍体文字セルとして配置する。
+    const nControlSpacer = document.createElement('div');
+    nControlSpacer.className = 'gojuon-control-spacer';
+    grid.appendChild(nControlSpacer);
+
+    const nCell = createKanaButton('ん', null, 0, true);
+    nCell.classList.add('gojuon-n-button');
+    grid.appendChild(nCell);
+    for (let i = 1; i < GOJUON_COLUMNS.length; i++) {
+      const spacer = document.createElement('div');
+      spacer.className = 'gojuon-n-spacer';
+      grid.appendChild(spacer);
+    }
+
+    // 最下部には各縦一列をハイライトする操作ボタンを置く。
+    const corner = document.createElement('div');
+    corner.className = 'gojuon-control-corner';
+    grid.appendChild(corner);
+    GOJUON_COLUMNS.forEach((_, columnIndex) => {
+      grid.appendChild(createHighlightButton('column', columnIndex));
     });
 
-    const nLabel = document.createElement('div');
-    nLabel.className = 'gojuon-row-label gojuon-n-label';
-    nLabel.textContent = '撥音';
-    grid.appendChild(nLabel);
-    grid.appendChild(createKanaButton('ん', true));
-    for (let i=0; i<GOJUON_COLUMNS.length-1; i++) {
-      const empty = document.createElement('div');
-      empty.className = 'gojuon-empty';
-      empty.setAttribute('aria-hidden','true');
-      grid.appendChild(empty);
-    }
+    updatePickerHighlights();
   }
 
-  function createKanaButton(kana, isN = false) {
+  function createKanaButton(kana, rowIndex, columnIndex, isN = false) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'gojuon-kana-button' + (isN ? ' gojuon-n-button' : '');
-    b.setAttribute('aria-label', `${kana}の龍体文字を選択`);
-
-    const reading = document.createElement('span');
-    reading.className = 'picker-kana-reading';
-    reading.textContent = kana;
+    b.setAttribute('aria-label', '龍体文字を選択');
+    if (rowIndex !== null) b.dataset.row = String(rowIndex);
+    if (columnIndex !== null) b.dataset.column = String(columnIndex);
 
     const glyph = document.createElement('span');
     glyph.className = 'picker-ryutai-glyph';
     glyph.textContent = kana;
 
-    b.append(reading, glyph);
+    b.append(glyph);
     b.addEventListener('click', () => chooseKana(kana));
     return b;
   }
+
+  function createHighlightButton(axis, index) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `table-highlight-control ${axis}-highlight-control`;
+    b.dataset.axis = axis;
+    b.dataset.index = String(index);
+    b.setAttribute('aria-label', axis === 'row' ? '横一列をハイライト' : '縦一列をハイライト');
+    b.innerHTML = '<span aria-hidden="true"></span>';
+
+    const apply = () => {
+      if (axis === 'row') pickerHighlightRow = pickerHighlightRow === index ? null : index;
+      else pickerHighlightColumn = pickerHighlightColumn === index ? null : index;
+      updatePickerHighlights();
+    };
+
+    b.addEventListener('click', apply);
+    b.addEventListener('pointerdown', (event) => {
+      pickerTraceActive = true;
+      // なぞり始めは、その位置へ確実にハイライトを合わせる。
+      if (axis === 'row') pickerHighlightRow = index;
+      else pickerHighlightColumn = index;
+      updatePickerHighlights();
+      if (b.setPointerCapture) {
+        try { b.setPointerCapture(event.pointerId); } catch (_) {}
+      }
+    });
+    b.addEventListener('pointerenter', () => {
+      if (!pickerTraceActive) return;
+      if (axis === 'row') pickerHighlightRow = index;
+      else pickerHighlightColumn = index;
+      updatePickerHighlights();
+    });
+    return b;
+  }
+
+  function updatePickerHighlights() {
+    qa('#kanaGrid [data-row][data-column]').forEach(cell => {
+      const row = Number(cell.dataset.row);
+      const column = Number(cell.dataset.column);
+      cell.classList.toggle('row-highlighted', pickerHighlightRow === row);
+      cell.classList.toggle('column-highlighted', pickerHighlightColumn === column);
+      cell.classList.toggle('cross-highlighted', pickerHighlightRow === row && pickerHighlightColumn === column);
+    });
+
+    qa('#kanaGrid .table-highlight-control').forEach(control => {
+      const index = Number(control.dataset.index);
+      const active = control.dataset.axis === 'row'
+        ? pickerHighlightRow === index
+        : pickerHighlightColumn === index;
+      control.classList.toggle('active', active);
+      control.setAttribute('aria-pressed', String(active));
+    });
+  }
+
+  window.addEventListener('pointerup', () => { pickerTraceActive = false; });
+  window.addEventListener('pointercancel', () => { pickerTraceActive = false; });
 
   function chooseKana(kana) {
     if (selectedSlot >= state.count) return;
