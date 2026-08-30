@@ -1,19 +1,20 @@
 (() => {
   'use strict';
 
-  // V3.4: 文字表には可視の仮名・行名・段名を出さず、龍体文字だけを表示する。
-  // 画面上は一般的な50音表の見た目に合わせ、左から「わ」側 → 「あ」側の順に配置する。
+  // V3.5: 文字表には可視の仮名・行名・段名を出さず、龍体文字だけを表示する。
+  // 左から「あ」側 → 「わ」側の順に並べ、わ列では「を」を「る」の右隣、
+  // 「ん」を「ろ」の右隣に配置する。
   const GOJUON_COLUMNS = [
-    { chars:['わ','','','','を'] },
-    { chars:['ら','り','る','れ','ろ'] },
-    { chars:['や','','ゆ','','よ'] },
-    { chars:['ま','み','む','め','も'] },
-    { chars:['は','ひ','ふ','へ','ほ'] },
-    { chars:['な','に','ぬ','ね','の'] },
-    { chars:['た','ち','つ','て','と'] },
-    { chars:['さ','し','す','せ','そ'] },
+    { chars:['あ','い','う','え','お'] },
     { chars:['か','き','く','け','こ'] },
-    { chars:['あ','い','う','え','お'] }
+    { chars:['さ','し','す','せ','そ'] },
+    { chars:['た','ち','つ','て','と'] },
+    { chars:['な','に','ぬ','ね','の'] },
+    { chars:['は','ひ','ふ','へ','ほ'] },
+    { chars:['ま','み','む','め','も'] },
+    { chars:['や','','ゆ','','よ'] },
+    { chars:['ら','り','る','れ','ろ'] },
+    { chars:['わ','','を','','ん'] }
   ];
   const GOJUON_ROWS = 5;
   const COLOR_DATA = [
@@ -43,7 +44,7 @@
   let db = null;
   let pickerHighlightRow = null;
   let pickerHighlightColumn = null;
-  let pickerTraceActive = false;
+  let pendingPickerKana = null;
 
   const $ = id => document.getElementById(id);
   const qa = sel => Array.from(document.querySelectorAll(sel));
@@ -296,7 +297,10 @@
     $('pickerTitle').textContent = `${selectedSlot+1}文字目を選択`;
     pickerHighlightRow = null;
     pickerHighlightColumn = null;
+    // すでにこの枠に文字が入っている場合は候補として表示する。
+    pendingPickerKana = state.characters[selectedSlot] || null;
     updatePickerHighlights();
+    updatePickerCandidate();
     $('pickerDialog').showModal();
   }
 
@@ -322,20 +326,6 @@
       });
     }
 
-    // 「ん」は50音表本体と混同しないよう、独立した龍体文字セルとして配置する。
-    const nControlSpacer = document.createElement('div');
-    nControlSpacer.className = 'gojuon-control-spacer';
-    grid.appendChild(nControlSpacer);
-
-    const nCell = createKanaButton('ん', null, 0, true);
-    nCell.classList.add('gojuon-n-button');
-    grid.appendChild(nCell);
-    for (let i = 1; i < GOJUON_COLUMNS.length; i++) {
-      const spacer = document.createElement('div');
-      spacer.className = 'gojuon-n-spacer';
-      grid.appendChild(spacer);
-    }
-
     // 最下部には各縦一列をハイライトする操作ボタンを置く。
     const corner = document.createElement('div');
     corner.className = 'gojuon-control-corner';
@@ -347,10 +337,10 @@
     updatePickerHighlights();
   }
 
-  function createKanaButton(kana, rowIndex, columnIndex, isN = false) {
+  function createKanaButton(kana, rowIndex, columnIndex) {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'gojuon-kana-button' + (isN ? ' gojuon-n-button' : '');
+    b.className = 'gojuon-kana-button';
     b.setAttribute('aria-label', '龍体文字を選択');
     if (rowIndex !== null) b.dataset.row = String(rowIndex);
     if (columnIndex !== null) b.dataset.column = String(columnIndex);
@@ -360,7 +350,12 @@
     glyph.textContent = kana;
 
     b.append(glyph);
-    b.addEventListener('click', () => chooseKana(kana));
+    b.dataset.kana = kana;
+    b.addEventListener('click', () => {
+      // 文字表上では即決定せず、候補を1文字だけ選択状態にする。
+      pendingPickerKana = kana;
+      updatePickerCandidate();
+    });
     return b;
   }
 
@@ -373,27 +368,10 @@
     b.setAttribute('aria-label', axis === 'row' ? '横一列をハイライト' : '縦一列をハイライト');
     b.innerHTML = '<span aria-hidden="true"></span>';
 
-    const apply = () => {
+    // 1回押すと選択状態を保持し、同じボタンをもう1回押すと解除する。
+    b.addEventListener('click', () => {
       if (axis === 'row') pickerHighlightRow = pickerHighlightRow === index ? null : index;
       else pickerHighlightColumn = pickerHighlightColumn === index ? null : index;
-      updatePickerHighlights();
-    };
-
-    b.addEventListener('click', apply);
-    b.addEventListener('pointerdown', (event) => {
-      pickerTraceActive = true;
-      // なぞり始めは、その位置へ確実にハイライトを合わせる。
-      if (axis === 'row') pickerHighlightRow = index;
-      else pickerHighlightColumn = index;
-      updatePickerHighlights();
-      if (b.setPointerCapture) {
-        try { b.setPointerCapture(event.pointerId); } catch (_) {}
-      }
-    });
-    b.addEventListener('pointerenter', () => {
-      if (!pickerTraceActive) return;
-      if (axis === 'row') pickerHighlightRow = index;
-      else pickerHighlightColumn = index;
       updatePickerHighlights();
     });
     return b;
@@ -418,8 +396,27 @@
     });
   }
 
-  window.addEventListener('pointerup', () => { pickerTraceActive = false; });
-  window.addEventListener('pointercancel', () => { pickerTraceActive = false; });
+
+  function updatePickerCandidate() {
+    qa('#kanaGrid .gojuon-kana-button').forEach(button => {
+      const selected = button.dataset.kana === pendingPickerKana;
+      button.classList.toggle('candidate-selected', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
+
+    const confirm = $('confirmPicker');
+    if (confirm) {
+      confirm.disabled = !pendingPickerKana;
+      confirm.setAttribute('aria-disabled', String(!pendingPickerKana));
+    }
+  }
+
+  function confirmPickerSelection() {
+    if (!pendingPickerKana) return;
+    const kana = pendingPickerKana;
+    pendingPickerKana = null;
+    chooseKana(kana);
+  }
 
   function chooseKana(kana) {
     if (selectedSlot >= state.count) return;
@@ -441,15 +438,18 @@
         showStep(7);
       } else {
         selectedSlot = chosenSlot + 1;
+        pendingPickerKana = state.characters[selectedSlot] || null;
         renderAll();
         $('pickerTitle').textContent = `${selectedSlot+1}文字目を選択`;
+        updatePickerCandidate();
       }
       return;
     }
 
-    if (selectedSlot < state.count - 1) selectedSlot++;
+    // 通常モードでは、決定した1文字だけを現在の枠へ反映して文字表を閉じる。
+    // 次の枠は作成画面側で選んでから、再び「文字を選択」を押す。
     renderAll();
-    $('pickerTitle').textContent = `${selectedSlot+1}文字目を選択`;
+    $('pickerDialog').close();
   }
 
   function toggleKanaAlias() {
@@ -569,7 +569,8 @@
     $('resonanceButton').addEventListener('click',()=>showDialog('共鳴練習','この試作品では共鳴練習機能は説明表示のみです。',[{label:'閉じる'}]));
     $('openPicker1').addEventListener('click',()=>openPicker(Math.min(selectedSlot,9)));
     $('openPicker2').addEventListener('click',()=>openPicker(Math.max(10,selectedSlot)));
-    $('closePicker').addEventListener('click',()=>$('pickerDialog').close());
+    $('closePicker').addEventListener('click',()=>{ pendingPickerKana = null; $('pickerDialog').close(); });
+    $('confirmPicker').addEventListener('click',confirmPickerSelection);
     $('clearSlots1').addEventListener('click',()=>{for(let i=0;i<10;i++)state.characters[i]='';renderAll();});
     $('clearSlots2').addEventListener('click',()=>{for(let i=10;i<20;i++)state.characters[i]='';renderAll();});
     $('toggleAlias1').addEventListener('click',toggleKanaAlias);

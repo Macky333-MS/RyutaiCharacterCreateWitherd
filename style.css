@@ -116,3 +116,18 @@
   .picker-ryutai-glyph{font-size:31px}
   .picker-guide{font-size:12px!important}
 }
+
+
+/* V3.5: 文字表の選択・ハイライト操作 */
+.gojuon-kana-button.candidate-selected{
+  background:#315fae!important;
+  border-color:#8fb0ff!important;
+  box-shadow:0 0 0 3px rgba(91,140,255,.28)!important;
+}
+.gojuon-kana-button.candidate-selected .picker-ryutai-glyph{color:#fff!important}
+/* 行・段のガイドが有効でも、候補文字は独立して押せる。 */
+.gojuon-kana-button{pointer-events:auto;position:relative;z-index:1}
+.gojuon-kana-button.candidate-selected{z-index:2}
+.picker-actions{justify-content:flex-end;gap:10px}
+.picker-actions .primary-dialog-action{background:#315fae!important;border-color:#6f96e8!important;color:#fff!important;font-weight:800}
+.picker-actions .primary-dialog-action:disabled{opacity:.4;cursor:not-allowed}
