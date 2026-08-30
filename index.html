@@ -82,7 +82,7 @@
                   <div class="segmented-control"><label><input type="radio" name="mode" value="normal" checked><span>通常</span></label><label><input type="radio" name="mode" value="single"><span>1文字ずつ</span></label></div>
                 </section>
               </div>
-              <button id="resonanceButton" class="quiet-feature" type="button"><span>⌁</span> 共鳴練習について</button>
+              <button id="resonanceButton" class="quiet-feature" type="button"><span>⌁</span> 共鳴練習</button>
             </div>
             <div class="wizard-footer"><button class="ghost-nav" data-prev="1" type="button">← 戻る</button><div></div><button class="primary-nav next-button" data-next="3" type="button">次へ <span>→</span></button></div>
           </div>
@@ -147,6 +147,31 @@
           </div>
 
           <div id="stepIndicator" class="step-indicator">1/7</div>
+        </div>
+      </section>
+
+      <section id="resonanceView" class="screen resonance-screen" aria-label="共鳴練習">
+        <div class="resonance-shell">
+          <div class="resonance-heading">
+            <div class="hero-icon small resonance-icon" aria-hidden="true">⌁</div>
+            <div>
+              <p class="step-kicker">RESONANCE</p>
+              <h1>共鳴練習</h1>
+              <p>右側の番号を選ぶと、対応する内容が表示されます。</p>
+            </div>
+          </div>
+          <div class="resonance-layout">
+            <div class="resonance-fields" aria-live="polite">
+              <div id="resonanceName" class="resonance-field" aria-label="名称"></div>
+              <div id="resonanceCode" class="resonance-field" aria-label="コード"></div>
+            </div>
+            <div class="resonance-choice-list" aria-label="共鳴練習の選択">
+              <button class="resonance-choice" data-resonance="1" type="button">1</button>
+              <button class="resonance-choice" data-resonance="2" type="button">2</button>
+              <button class="resonance-choice" data-resonance="3" type="button">3</button>
+            </div>
+          </div>
+          <div class="resonance-footer"><button id="backFromResonance" class="ghost-nav" type="button">← 戻る</button></div>
         </div>
       </section>
 

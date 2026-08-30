@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  // V3.5: 文字表には可視の仮名・行名・段名を出さず、龍体文字だけを表示する。
+  // V3.6: 共鳴練習画面を追加。文字表・作成フローはV3.5を継承する。
   // 左から「あ」側 → 「わ」側の順に並べ、わ列では「を」を「る」の右隣、
   // 「ん」を「ろ」の右隣に配置する。
   const GOJUON_COLUMNS = [
@@ -21,6 +21,12 @@
     ['黒色','#000000'],['水色','#00d7df'],['黄緑色','#9acd32'],['緑色','#00ee00'],['黄色','#ffe600'],['だいだい色','#ffa000'],['ピンク色','#efb0bf'],['赤色','#ff1010'],['紫色','#ef00e8'],['青色','#1111ee'],
     ['茶色','#8b5a3c'],['薄だいだい色','#ffd4ae'],['山吹色','#ffbf00'],['黄土色','#bd9e4c'],['深緑色','#006633'],['群青色','#003171'],['すみれ色','#8c66b3'],['赤紫色','#993366'],['朱色','#e24200'],['こげ茶色','#4d331a'],['ねずみ色','#808080'],['白色','#ffffff'],['銀色','#c0c0c0'],['金色','#d9a621']
   ];
+
+  const RESONANCE_DATA = {
+    1: { name: '免疫機能', code: 'B222' },
+    2: { name: '子宮', code: 'D449' },
+    3: { name: '男性生殖器', code: 'D995' }
+  };
 
   const freshState = () => ({
     editingId: null,
@@ -461,12 +467,35 @@
 
     showDialog(
       '仮名表示について',
-      '仮名表示を有効にすると、各龍体文字の上に対応するひらがなを表示します。\n\n龍体文字そのものの形を見て覚える場合は、仮名を表示しない使い方を推奨します。仮名を表示してもよいですか？',
+      '仮名表示を有効にすると、各龍体文字の上に対応するひらがなを表示します。\n\nひらがなを同時に見ることで、その文字の印象に引っ張られ、龍体文字から自由にイメージしにくくなる可能性があります。それでも仮名を表示しますか？',
       [
         {label:'キャンセル'},
         {label:'表示する', action:()=>{ state.alias = true; renderAll(); }}
       ]
     );
+  }
+
+  function openResonanceScreen() {
+    $('resonanceName').textContent = '';
+    $('resonanceCode').textContent = '';
+    qa('.resonance-choice').forEach(button => {
+      button.classList.remove('selected');
+      button.setAttribute('aria-pressed', 'false');
+    });
+    showView('resonanceView');
+    window.scrollTo({top:0, behavior:'auto'});
+  }
+
+  function selectResonance(number) {
+    const data = RESONANCE_DATA[number];
+    if (!data) return;
+    $('resonanceName').textContent = data.name;
+    $('resonanceCode').textContent = data.code;
+    qa('.resonance-choice').forEach(button => {
+      const selected = Number(button.dataset.resonance) === number;
+      button.classList.toggle('selected', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
   }
 
   function renderPreview() {
@@ -566,7 +595,21 @@
     $('countDown').addEventListener('click',()=>{state.count=Math.max(0,state.count-1);renderAll();});
     qa('input[name="mode"]').forEach(r=>r.addEventListener('change',()=>{state.mode=r.value; renderAll();}));
     $('modeHelp').addEventListener('click',()=>showDialog('作成モード','通常：指定した文字数分の龍体文字を先に選び、その後に各文字の色を決めます。\n1文字：1文字目を選ぶ → 1文字目の色を決める → 2文字目を選ぶ…の順で、指定文字数まで繰り返します。\nカラーOFFの場合は、どちらのモードでも色選択STEPをスキップします。',[{label:'閉じる'}]));
-    $('resonanceButton').addEventListener('click',()=>showDialog('共鳴練習','この試作品では共鳴練習機能は説明表示のみです。',[{label:'閉じる'}]));
+    $('resonanceButton').addEventListener('click',()=>showDialog(
+      '共鳴練習へ移動しますか？',
+      '現在の作成内容はそのまま保持されます。共鳴練習の画面へ移動してもよいですか？',
+      [
+        {label:'キャンセル'},
+        {label:'移動する', action:openResonanceScreen}
+      ]
+    ));
+    qa('.resonance-choice').forEach(button => {
+      button.addEventListener('click', () => selectResonance(Number(button.dataset.resonance)));
+    });
+    $('backFromResonance').addEventListener('click', () => {
+      showView('createView');
+      showStep(2);
+    });
     $('openPicker1').addEventListener('click',()=>openPicker(Math.min(selectedSlot,9)));
     $('openPicker2').addEventListener('click',()=>openPicker(Math.max(10,selectedSlot)));
     $('closePicker').addEventListener('click',()=>{ pendingPickerKana = null; $('pickerDialog').close(); });
