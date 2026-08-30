@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  // V3.9: STEP7プレビュー/画像保存を修復し、履歴詳細・CSV・Word出力を追加。
+  // V3.10: プレビュー背景を中間グレーへ変更し、完成時の履歴保存を堅牢化。
   // 左から「あ」側 → 「わ」側の順に並べ、わ列では「を」を「る」の右隣、
   // 「ん」を「ろ」の右隣に配置する。
   const GOJUON_COLUMNS = [
@@ -557,7 +557,7 @@
   function recordFromState(existing) {
     const now=new Date().toISOString();
     return {
-      id: existing?.id || state.editingId || (crypto.randomUUID ? crypto.randomUUID() : `r-${Date.now()}`),
+      id: existing?.id || state.editingId || ((window.crypto && typeof window.crypto.randomUUID === 'function') ? window.crypto.randomUUID() : `r-${Date.now()}-${Math.random().toString(36).slice(2)}`),
       itemName: state.itemName.trim(), count:state.count, useColor:state.useColor, mode:state.mode, palette:state.palette,
       characters:state.characters.slice(0,state.count), colors:state.colors.slice(0,state.count), layout:state.layout,
       favorite: existing?.favorite || false, createdAt: existing?.createdAt || now, updatedAt: now
@@ -572,15 +572,32 @@
       req.onsuccess=()=>{db=req.result;resolve();}; req.onerror=()=>reject(req.error);
     });
   }
-  function storePut(record){ return new Promise((res,rej)=>{ const tx=db.transaction('works','readwrite'); tx.objectStore('works').put(record); tx.oncomplete=()=>res(record); tx.onerror=()=>rej(tx.error); }); }
-  function storeDelete(id){ return new Promise((res,rej)=>{ const tx=db.transaction('works','readwrite'); tx.objectStore('works').delete(id); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); }); }
-  function storeAll(){ return new Promise((res,rej)=>{ const tx=db.transaction('works','readonly'); const r=tx.objectStore('works').getAll(); r.onsuccess=()=>res(r.result||[]); r.onerror=()=>rej(r.error); }); }
-  function storeGet(id){ return new Promise((res,rej)=>{ const tx=db.transaction('works','readonly'); const r=tx.objectStore('works').get(id); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+  function requireDb() {
+    if (!db) throw new Error('ローカル保存データベースを利用できません。');
+    return db;
+  }
+  function storePut(record){ return new Promise((res,rej)=>{ try { const d=requireDb(); const tx=d.transaction('works','readwrite'); const req=tx.objectStore('works').put(record); req.onerror=()=>rej(req.error || new Error('保存要求に失敗しました。')); tx.oncomplete=()=>res(record); tx.onerror=()=>rej(tx.error || new Error('保存処理に失敗しました。')); tx.onabort=()=>rej(tx.error || new Error('保存処理が中断されました。')); } catch(e) { rej(e); } }); }
+  function storeDelete(id){ return new Promise((res,rej)=>{ try { const d=requireDb(); const tx=d.transaction('works','readwrite'); tx.objectStore('works').delete(id); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); } catch(e) { rej(e); } }); }
+  function storeAll(){ return new Promise((res,rej)=>{ try { const d=requireDb(); const tx=d.transaction('works','readonly'); const r=tx.objectStore('works').getAll(); r.onsuccess=()=>res(r.result||[]); r.onerror=()=>rej(r.error); } catch(e) { rej(e); } }); }
+  function storeGet(id){ return new Promise((res,rej)=>{ try { const d=requireDb(); const tx=d.transaction('works','readonly'); const r=tx.objectStore('works').get(id); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); } catch(e) { rej(e); } }); }
 
   async function finishWork() {
-    const existing=state.editingId ? await storeGet(state.editingId) : null;
-    const rec=recordFromState(existing); await storePut(rec); state.editingId=rec.id;
-    showDialog('保存完了','履歴へ保存しました。画像は履歴画面から任意のタイミングで保存できます。',[{label:'履歴を見る',action:openHistoryView},{label:'メニューへ',action:()=>showView('homeView')}]);
+    const finishButton = $('finishButton');
+    if (finishButton) { finishButton.disabled = true; finishButton.textContent = '保存中…'; }
+    try {
+      if (!db) await initDb();
+      const existing=state.editingId ? await storeGet(state.editingId) : null;
+      const rec=recordFromState(existing);
+      await storePut(rec);
+      state.editingId=rec.id;
+      selectedHistoryId=rec.id;
+      showDialog('保存完了','履歴へ保存しました。画像・CSV・Wordは保存データ画面から任意のタイミングで保存できます。',[{label:'履歴を見る',action:openHistoryView},{label:'メニューへ',action:()=>showView('homeView')}]);
+    } catch (e) {
+      console.error('履歴保存に失敗しました。', e);
+      showDialog('保存できませんでした',`端末内への保存に失敗しました。\n\n${e && e.message ? e.message : 'ブラウザの保存領域を確認してください。'}\n\nページを再読み込みしても改善しない場合は、Safari/Chromeのプライベートブラウズを解除し、通常タブでお試しください。`,[{label:'閉じる'}]);
+    } finally {
+      if (finishButton) { finishButton.disabled = false; finishButton.textContent = '保存'; }
+    }
   }
 
   async function openHistoryView() { showView('historyView'); await renderHistory(); }
@@ -664,8 +681,8 @@
   function drawExport(r){
     const c=$('exportCanvas'),ctx=c.getContext('2d');
     ctx.clearRect(0,0,c.width,c.height);
-    // アプリ表示と同様に濃色背景にすることで、白文字も見えるようにする。
-    ctx.fillStyle='#111318'; ctx.fillRect(0,0,c.width,c.height);
+    // 黒文字・白文字のどちらも判別しやすい中間グレー背景。
+    ctx.fillStyle='#7A7F87'; ctx.fillRect(0,0,c.width,c.height);
     ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='96px RyutaiWeb, pkryutaib3, sans-serif';
     const p=getPositions(r.count,r.layout);
     for(let i=0;i<r.count;i++){
