@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  // V3.10: プレビュー背景を中間グレーへ変更し、完成時の履歴保存を堅牢化。
+  // V3.12: 保存データから画像・CSV・Wordを複数選択して端末の共有メニューへ渡せる共有機能を追加。
   // 左から「あ」側 → 「わ」側の順に並べ、わ列では「を」を「る」の右隣、
   // 「ん」を「ろ」の右隣に配置する。
   const GOJUON_COLUMNS = [
@@ -688,20 +688,115 @@
     setTimeout(() => { URL.revokeObjectURL(url); link.remove(); }, 1500);
   }
 
-  async function saveImageSelected(){
-    if(!selectedHistoryId)return;
-    const r=await storeGet(selectedHistoryId);
+  function canvasToBlob(canvas, type='image/png', quality) {
+    return new Promise((resolve, reject) => {
+      if (canvas.toBlob) {
+        canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('画像データを作成できませんでした。')), type, quality);
+        return;
+      }
+      try {
+        const dataUrl = canvas.toDataURL(type, quality);
+        const [meta, data] = dataUrl.split(',');
+        const mime = (meta.match(/data:([^;]+)/)||[])[1] || type;
+        const binary = atob(data);
+        const bytes = new Uint8Array(binary.length);
+        for (let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
+        resolve(new Blob([bytes], {type:mime}));
+      } catch (e) { reject(e); }
+    });
+  }
+
+  async function buildImageFile(r) {
     await ensureRyutaiFontReady();
     drawExport(r);
-    const canvas=$('exportCanvas');
-    const filename=`Ryutai_${sanitizeFile(r.itemName)}_${Date.now()}.png`;
-    if (canvas.toBlob) {
-      canvas.toBlob(blob => {
-        if (blob) downloadBlob(blob, filename);
-        else showDialog('画像保存','画像データを作成できませんでした。',[{label:'閉じる'}]);
-      }, 'image/png');
-    } else {
-      const link=document.createElement('a'); link.download=filename; link.href=canvas.toDataURL('image/png'); link.click();
+    const blob = await canvasToBlob($('exportCanvas'), 'image/png');
+    return new File([blob], `Ryutai_${sanitizeFile(r.itemName)}_${Date.now()}.png`, {type:'image/png'});
+  }
+
+  function buildCsvFile(r) {
+    const chars = r.characters.map(csvCell).join(',');
+    const hexes = r.characters.map((_,i) => csvCell(normalizeHex(r.useColor ? r.colors[i] : '#ffffff'))).join(',');
+    const csv = '\ufeff' + chars + '\r\n' + hexes + '\r\n';
+    return new File([csv], `Ryutai_${sanitizeFile(r.itemName)}_${Date.now()}.csv`, {type:'text/csv;charset=utf-8'});
+  }
+
+  function buildWordFile(r) {
+    const runs = r.characters.map((c,i) => {
+      const color = normalizeHex(r.useColor ? r.colors[i] : '#ffffff');
+      return `<span style="font-family:'pkryutaib3','RyutaiWeb';font-size:54pt;color:${color};margin-right:6pt;">${escapeHtml(c)}</span>`;
+    }).join('');
+    const rows = r.characters.map((c,i) => `<tr><td>${i+1}</td><td>${escapeHtml(c)}</td><td>${normalizeHex(r.useColor ? r.colors[i] : '#ffffff')}</td></tr>`).join('');
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(r.itemName)}</title><style>body{font-family:'Yu Gothic','Meiryo',sans-serif;color:#111}.ryutai-box{background:#777;padding:28pt;border-radius:10pt;margin:18pt 0;line-height:1.8}table{border-collapse:collapse;margin-top:18pt}th,td{border:1px solid #999;padding:6pt 10pt;text-align:center}h1{font-size:20pt}</style></head><body><h1>${escapeHtml(r.itemName)}</h1><p>形状：${layoutLabel(r.layout)}</p><div class="ryutai-box">${runs}</div><table><thead><tr><th>No.</th><th>対応するひらがな</th><th>HEX</th></tr></thead><tbody>${rows}</tbody></table><p style="font-size:9pt;color:#666">※龍体文字を同じ字形で表示・編集するには、Wordを開く端末に「pkryutaib3」フォントをインストールしてください。</p></body></html>`;
+    return new File(['\ufeff', html], `Ryutai_${sanitizeFile(r.itemName)}_${Date.now()}.doc`, {type:'application/msword;charset=utf-8'});
+  }
+
+  async function openShareDialog() {
+    if (!selectedHistoryId) return;
+    $('shareStatus').textContent = '';
+    $('shareImageChoice').checked = true;
+    $('shareCsvChoice').checked = false;
+    $('shareWordChoice').checked = false;
+    $('shareDialog').showModal();
+  }
+
+  async function executeShareSelected() {
+    if (!selectedHistoryId) return;
+    const wantImage = $('shareImageChoice').checked;
+    const wantCsv = $('shareCsvChoice').checked;
+    const wantWord = $('shareWordChoice').checked;
+    if (!wantImage && !wantCsv && !wantWord) {
+      $('shareStatus').textContent = '共有するデータを1つ以上選択してください。';
+      return;
+    }
+    const button = $('executeShare');
+    const oldLabel = button.textContent;
+    button.disabled = true;
+    button.textContent = '準備中…';
+    $('shareStatus').textContent = '';
+    try {
+      const r = await storeGet(selectedHistoryId);
+      const files = [];
+      if (wantImage) files.push(await buildImageFile(r));
+      if (wantCsv) files.push(buildCsvFile(r));
+      if (wantWord) files.push(buildWordFile(r));
+
+      const shareData = {
+        title: `龍体文字：${r.itemName}`,
+        text: `「${r.itemName}」の龍体文字データです。`,
+        files
+      };
+      const fileShareSupported = !!(navigator.share && (!navigator.canShare || navigator.canShare({files})));
+      if (fileShareSupported) {
+        await navigator.share(shareData);
+        $('shareDialog').close();
+        return;
+      }
+
+      // ブラウザがファイル共有に未対応の場合は、選択ファイルを端末へ保存する。
+      files.forEach(file => downloadBlob(file, file.name));
+      $('shareStatus').textContent = 'このブラウザはファイル共有に対応していないため、選択したファイルを保存しました。保存したファイルをLINEなどから添付してください。';
+    } catch (e) {
+      if (e && e.name === 'AbortError') {
+        $('shareStatus').textContent = '共有をキャンセルしました。';
+      } else {
+        console.error(e);
+        $('shareStatus').textContent = '共有データの作成に失敗しました。もう一度お試しください。';
+      }
+    } finally {
+      button.disabled = false;
+      button.textContent = oldLabel;
+    }
+  }
+
+  async function saveImageSelected(){
+    if(!selectedHistoryId)return;
+    try {
+      const r=await storeGet(selectedHistoryId);
+      const file=await buildImageFile(r);
+      downloadBlob(file, file.name);
+    } catch(e) {
+      console.error(e);
+      showDialog('画像保存','画像データを作成できませんでした。',[{label:'閉じる'}]);
     }
   }
 
@@ -725,25 +820,15 @@
   async function saveCsvSelected() {
     if (!selectedHistoryId) return;
     const r = await storeGet(selectedHistoryId);
-    const chars = r.characters.map(csvCell).join(',');
-    const hexes = r.characters.map((_,i) => csvCell(normalizeHex(r.useColor ? r.colors[i] : '#ffffff'))).join(',');
-    // 1行目=対応するひらがな、2行目=HEX。Excelで各文字が1列ずつ対応する。
-    const csv = '\ufeff' + chars + '\r\n' + hexes + '\r\n';
-    downloadBlob(new Blob([csv], {type:'text/csv;charset=utf-8'}), `Ryutai_${sanitizeFile(r.itemName)}_${Date.now()}.csv`);
+    const file = buildCsvFile(r);
+    downloadBlob(file, file.name);
   }
 
   async function saveWordSelected() {
     if (!selectedHistoryId) return;
     const r = await storeGet(selectedHistoryId);
-    // Wordで開けるHTML形式の.doc。龍体文字は編集可能な文字として保持する。
-    // Word側でも同じ字形にするには pkryutaib3 フォントのインストールが必要。
-    const runs = r.characters.map((c,i) => {
-      const color = normalizeHex(r.useColor ? r.colors[i] : '#ffffff');
-      return `<span style="font-family:'pkryutaib3','RyutaiWeb';font-size:54pt;color:${color};margin-right:6pt;">${escapeHtml(c)}</span>`;
-    }).join('');
-    const rows = r.characters.map((c,i) => `<tr><td>${i+1}</td><td>${escapeHtml(c)}</td><td>${normalizeHex(r.useColor ? r.colors[i] : '#ffffff')}</td></tr>`).join('');
-    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(r.itemName)}</title><style>body{font-family:'Yu Gothic','Meiryo',sans-serif;color:#111} .ryutai-box{background:#111318;padding:28pt;border-radius:10pt;margin:18pt 0;line-height:1.8} table{border-collapse:collapse;margin-top:18pt}th,td{border:1px solid #999;padding:6pt 10pt;text-align:center}h1{font-size:20pt}</style></head><body><h1>${escapeHtml(r.itemName)}</h1><p>形状：${layoutLabel(r.layout)}</p><div class="ryutai-box">${runs}</div><table><thead><tr><th>No.</th><th>対応するひらがな</th><th>HEX</th></tr></thead><tbody>${rows}</tbody></table><p style="font-size:9pt;color:#666">※龍体文字を同じ字形で表示・編集するには、Wordを開く端末に「pkryutaib3」フォントをインストールしてください。</p></body></html>`;
-    downloadBlob(new Blob(['\ufeff', html], {type:'application/msword;charset=utf-8'}), `Ryutai_${sanitizeFile(r.itemName)}_${Date.now()}.doc`);
+    const file = buildWordFile(r);
+    downloadBlob(file, file.name);
   }
 
   function csvCell(value) {
@@ -814,6 +899,9 @@
     $('saveImageHistory').addEventListener('click',saveImageSelected);
     $('saveCsvHistory').addEventListener('click',saveCsvSelected);
     $('saveWordHistory').addEventListener('click',saveWordSelected);
+    $('shareHistory').addEventListener('click',openShareDialog);
+    $('closeShare').addEventListener('click',()=>$('shareDialog').close());
+    $('executeShare').addEventListener('click',executeShareSelected);
     $('deleteHistory').addEventListener('click',deleteSelected);
   }
 

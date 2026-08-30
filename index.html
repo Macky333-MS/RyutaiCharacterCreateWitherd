@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#111318" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>龍体文字作成 Web V3.11</title>
+  <title>龍体文字作成 Web V3.12</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -186,7 +186,7 @@
             <section class="history-pane detail-pane">
               <div class="pane-heading detail-heading"><button id="historyBackList" class="mobile-back-list" type="button">← 一覧</button><h2>詳細</h2></div>
               <div id="historyDetail" class="history-detail empty-detail">左の作品を選択すると、ここに詳細が表示されます。</div>
-              <div id="historyActions" class="history-actions hidden"><button id="favoriteHistory" type="button">☆ お気に入り</button><button id="editHistory" type="button">再編集</button><button id="duplicateHistory" type="button">複製</button><button id="saveImageHistory" type="button">画像保存</button><button id="saveCsvHistory" type="button">CSV保存</button><button id="saveWordHistory" type="button">Word保存</button><button id="deleteHistory" class="danger-action" type="button">削除</button></div>
+              <div id="historyActions" class="history-actions hidden"><button id="favoriteHistory" type="button">☆ お気に入り</button><button id="editHistory" type="button">再編集</button><button id="duplicateHistory" type="button">複製</button><button id="saveImageHistory" type="button">画像保存</button><button id="saveCsvHistory" type="button">CSV保存</button><button id="saveWordHistory" type="button">Word保存</button><button id="shareHistory" class="share-action" type="button">共有</button><button id="deleteHistory" class="danger-action" type="button">削除</button></div>
             </section>
           </div>
         </div>
@@ -197,6 +197,19 @@
   <dialog id="messageDialog" class="app-dialog"><h3 id="dialogTitle">確認</h3><p id="dialogMessage"></p><div id="dialogButtons" class="dialog-buttons"></div></dialog>
   <dialog id="pickerDialog" class="app-dialog picker-dialog"><h3 id="pickerTitle">文字選択</h3><p class="dialog-sub">50音表と対応付けています。</p><div class="gojuon-scroll"><div id="kanaGrid" class="kana-grid" aria-label="龍体文字の文字表"></div></div><p class="picker-guide">左側と下側のボタンを押すと、その横一列・縦一列をハイライトできます。同じボタンをもう一度押すと解除できます。</p><div class="dialog-buttons picker-actions"><button id="closePicker" type="button">閉じる</button><button id="confirmPicker" class="primary-dialog-action" type="button" disabled>決定</button></div></dialog>
   <dialog id="previewDialog" class="app-dialog preview-dialog"><h3>完成イメージ</h3><div id="previewCanvas" class="preview-canvas"></div><div class="dialog-buttons"><button id="closePreview" type="button">閉じる</button></div></dialog>
+
+  <dialog id="shareDialog" class="app-dialog share-dialog">
+    <h3>共有するデータを選択</h3>
+    <p class="dialog-sub">1つ以上選択してください。共有先はスマホ・パソコンの共有メニューから選べます。</p>
+    <div class="share-choice-list">
+      <label class="share-choice"><input id="shareImageChoice" type="checkbox" checked><span><strong>画像</strong><small>完成した龍体文字をPNGで共有</small></span></label>
+      <label class="share-choice"><input id="shareCsvChoice" type="checkbox"><span><strong>CSV</strong><small>各文字とHEXコードを共有</small></span></label>
+      <label class="share-choice"><input id="shareWordChoice" type="checkbox"><span><strong>Word</strong><small>色付き龍体文字をWord形式で共有</small></span></label>
+    </div>
+    <p id="shareStatus" class="share-status" aria-live="polite"></p>
+    <div class="dialog-buttons"><button id="closeShare" type="button">閉じる</button><button id="executeShare" class="primary-dialog-action" type="button">共有する</button></div>
+  </dialog>
+  <div class="version-badge" aria-label="アプリのバージョン">Version 3.12</div>
   <canvas id="exportCanvas" width="1200" height="1200" hidden></canvas>
   <script src="app.js"></script>
 </body>
