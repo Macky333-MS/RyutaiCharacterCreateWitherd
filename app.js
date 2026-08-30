@@ -25,6 +25,7 @@
   let selectedSlot = 0;
   let selectedHistoryId = null;
   let favoritesOnly = false;
+  let singleAwaitingColor = false;
   let db = null;
 
   const $ = id => document.getElementById(id);
@@ -104,20 +105,52 @@
 
   function renderPalette() {
     const wrap = $('paletteColors'); wrap.innerHTML = '';
+    const targetWrap = $('colorTargetSlots');
+    if (targetWrap) {
+      targetWrap.innerHTML = '';
+      for (let i=0; i<state.count; i++) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'color-target-slot';
+        if (i === selectedSlot) b.classList.add('selected');
+        b.innerHTML = `<small>${i+1}</small><span>${escapeHtml(state.characters[i] || '□')}</span>`;
+        b.style.color = state.colors[i] || '#000000';
+        b.addEventListener('click', () => { selectedSlot = i; renderPalette(); });
+        targetWrap.appendChild(b);
+      }
+    }
+
     COLOR_DATA.slice(0, state.palette).forEach(([name, hex]) => {
       const b = document.createElement('button');
       b.type='button'; b.className='color-swatch'; b.style.background=hex; b.title=name;
-      if (state.selectedColor.toLowerCase() === hex.toLowerCase()) b.classList.add('selected');
+      if ((state.colors[selectedSlot] || state.selectedColor).toLowerCase() === hex.toLowerCase()) b.classList.add('selected');
       b.addEventListener('click', () => {
         state.selectedColor = hex;
-        for (let i=0; i<state.count; i++) state.colors[i] = hex;
-        $('selectedColorLabel').textContent = `選択中：${name}`;
+        if (selectedSlot < state.count) state.colors[selectedSlot] = hex;
+        $('selectedColorLabel').textContent = `${selectedSlot+1}文字目：${name}`;
+
+        if (state.mode === 'single' && singleAwaitingColor) {
+          singleAwaitingColor = false;
+          const finishedSlot = selectedSlot;
+          renderAll();
+          if (finishedSlot >= state.count - 1) {
+            showStep(7);
+          } else {
+            selectedSlot = finishedSlot + 1;
+            showStep(characterStepForSlot(selectedSlot));
+            setTimeout(() => openPicker(selectedSlot), 0);
+          }
+          return;
+        }
+
+        if (state.mode === 'normal' && selectedSlot < state.count - 1) selectedSlot++;
         renderAll();
       });
       wrap.appendChild(b);
     });
-    const found = COLOR_DATA.find(x => x[1].toLowerCase() === state.selectedColor.toLowerCase());
-    $('selectedColorLabel').textContent = `選択中：${found ? found[0] : state.selectedColor}`;
+    const currentHex = state.colors[selectedSlot] || state.selectedColor;
+    const found = COLOR_DATA.find(x => x[1].toLowerCase() === currentHex.toLowerCase());
+    $('selectedColorLabel').textContent = `${selectedSlot+1}文字目：${found ? found[0] : currentHex}`;
   }
 
   function renderFinalCharacters() {
@@ -146,11 +179,85 @@
     if (step === 2 && state.count < 1) {
       showDialog('入力確認','使用する文字数を1〜20文字の範囲で設定してください。',[{label:'閉じる'}]); return false;
     }
-    if ((step === 3 || step === 4)) {
-      const missing = state.characters.slice(0,state.count).some(x => !x);
-      if (missing) { showDialog('文字選択','指定した文字数分の龍体文字を選択してください。',[{label:'閉じる'}]); return false; }
+    if (step === 3) {
+      const end = Math.min(state.count, 10);
+      const missing = state.characters.slice(0, end).some(x => !x);
+      if (missing) { showDialog('文字選択',`1〜${end}文字目までの龍体文字を選択してください。`,[{label:'閉じる'}]); return false; }
+    }
+    if (step === 4) {
+      const missing = state.characters.slice(10, state.count).some(x => !x);
+      if (missing) { showDialog('文字選択','11文字目以降の龍体文字を選択してください。',[{label:'閉じる'}]); return false; }
     }
     return true;
+  }
+
+  function characterStepForSlot(slot) {
+    return slot < 10 ? 3 : 4;
+  }
+
+  function lastCharacterStep() {
+    return state.count > 10 ? 4 : 3;
+  }
+
+  function firstMissingSlot() {
+    const index = state.characters.slice(0, state.count).findIndex(x => !x);
+    return index === -1 ? Math.max(0, state.count - 1) : index;
+  }
+
+  function goNextFromStep(step) {
+    if (!validateStep(step)) return;
+
+    if (step === 1) return showStep(2);
+
+    if (step === 2) {
+      // 1文字モード＋カラーONでは、先に使う色数を決めてから
+      // 「文字 → その文字の色 → 次の文字…」の流れへ入る。
+      if (state.mode === 'single' && state.useColor) return showStep(5);
+      selectedSlot = firstMissingSlot();
+      showStep(3);
+      if (state.mode === 'single') setTimeout(() => openPicker(selectedSlot), 0);
+      return;
+    }
+
+    if (step === 3) {
+      if (state.count > 10) return showStep(4);
+      if (!state.useColor) return showStep(7);
+      return showStep(5);
+    }
+
+    if (step === 4) {
+      if (!state.useColor) return showStep(7);
+      return showStep(5);
+    }
+
+    if (step === 5) {
+      if (!state.useColor) return showStep(7);
+      if (state.mode === 'single') {
+        selectedSlot = firstMissingSlot();
+        showStep(characterStepForSlot(selectedSlot));
+        setTimeout(() => openPicker(selectedSlot), 0);
+        return;
+      }
+      selectedSlot = 0;
+      return showStep(6);
+    }
+
+    if (step === 6) return showStep(7);
+  }
+
+  function goPrevFromStep(step) {
+    if (step === 2) return showStep(1);
+    if (step === 3) {
+      if (state.mode === 'single' && state.useColor) return showStep(5);
+      return showStep(2);
+    }
+    if (step === 4) return showStep(3);
+    if (step === 5) return showStep(lastCharacterStep());
+    if (step === 6) return showStep(5);
+    if (step === 7) {
+      if (!state.useColor) return showStep(lastCharacterStep());
+      return showStep(6);
+    }
   }
 
   function openPicker(startIndex) {
@@ -166,8 +273,32 @@
       const b=document.createElement('button'); b.type='button'; b.textContent=k;
       b.addEventListener('click', () => {
         if (selectedSlot < state.count) {
-          state.characters[selectedSlot] = k;
-          state.colors[selectedSlot] = state.selectedColor;
+          const chosenSlot = selectedSlot;
+          state.characters[chosenSlot] = k;
+
+          if (state.mode === 'single') {
+            if (state.useColor) {
+              // 1文字モード：文字を決めた直後に、その文字の色選択へ移動。
+              selectedSlot = chosenSlot;
+              singleAwaitingColor = true;
+              $('pickerDialog').close();
+              showStep(6);
+              return;
+            }
+
+            // カラーOFFなら色選択は挟まず、次の文字へそのまま進む。
+            if (chosenSlot >= state.count - 1) {
+              $('pickerDialog').close();
+              showStep(7);
+            } else {
+              selectedSlot = chosenSlot + 1;
+              renderAll();
+              $('pickerTitle').textContent = `${selectedSlot+1}文字目を選択`;
+            }
+            return;
+          }
+
+          // 通常モードは、まず指定文字数分の龍体文字をまとめて選択する。
           if (selectedSlot < state.count-1) selectedSlot++;
           renderAll();
           $('pickerTitle').textContent = `${selectedSlot+1}文字目を選択`;
@@ -284,16 +415,16 @@
     $('startCreate').addEventListener('click',startNew);
     $('openHistory').addEventListener('click',openHistoryView);
     $('itemName').addEventListener('input',e=>{state.itemName=e.target.value;updateNameStrips();});
-    qa('[data-next]').forEach(b=>b.addEventListener('click',()=>{ if(validateStep(Number(b.closest('.step-page').dataset.step))) showStep(Number(b.dataset.next)); }));
-    qa('[data-prev]').forEach(b=>b.addEventListener('click',()=>showStep(Number(b.dataset.prev))));
+    qa('[data-next]').forEach(b=>b.addEventListener('click',()=>goNextFromStep(Number(b.closest('.step-page').dataset.step))));
+    qa('[data-prev]').forEach(b=>b.addEventListener('click',()=>goPrevFromStep(Number(b.closest('.step-page').dataset.step))));
     $('exitCreate1').addEventListener('click',()=>showDialog('終了確認','龍体文字作成を終了しますか？\n未保存の内容は破棄されます。',[{label:'キャンセル'},{label:'終了',action:()=>showView('homeView')} ]));
     const wizardHome=$('wizardHomeButton'); if(wizardHome) wizardHome.addEventListener('click',()=>showDialog('終了確認','龍体文字作成を終了しますか？\n未保存の内容は破棄されます。',[{label:'キャンセル'},{label:'終了',action:()=>showView('homeView')} ]));
     qa('.show-full-name').forEach(b=>b.addEventListener('click',()=>showDialog('項目名',nameText(),[{label:'閉じる'}])));
-    $('colorToggle').addEventListener('click',()=>{state.useColor=!state.useColor;renderAll();});
+    $('colorToggle').addEventListener('click',()=>{state.useColor=!state.useColor; singleAwaitingColor=false; renderAll();});
     $('countUp').addEventListener('click',()=>{state.count=Math.min(20,state.count+1);renderAll();});
     $('countDown').addEventListener('click',()=>{state.count=Math.max(0,state.count-1);renderAll();});
-    qa('input[name="mode"]').forEach(r=>r.addEventListener('change',()=>{state.mode=r.value; if(r.value==='single')state.count=1; renderAll();}));
-    $('modeHelp').addEventListener('click',()=>showDialog('作成モード','通常：指定した文字数で龍体文字を作成します。\n1文字：1文字だけで作成します。',[{label:'閉じる'}]));
+    qa('input[name="mode"]').forEach(r=>r.addEventListener('change',()=>{state.mode=r.value; renderAll();}));
+    $('modeHelp').addEventListener('click',()=>showDialog('作成モード','通常：指定した文字数分の龍体文字を先に選び、その後に各文字の色を決めます。\n1文字：1文字目を選ぶ → 1文字目の色を決める → 2文字目を選ぶ…の順で、指定文字数まで繰り返します。\nカラーOFFの場合は、どちらのモードでも色選択STEPをスキップします。',[{label:'閉じる'}]));
     $('resonanceButton').addEventListener('click',()=>showDialog('共鳴練習','この試作品では共鳴練習機能は説明表示のみです。',[{label:'閉じる'}]));
     $('openPicker1').addEventListener('click',()=>openPicker(Math.min(selectedSlot,9)));
     $('openPicker2').addEventListener('click',()=>openPicker(Math.max(10,selectedSlot)));

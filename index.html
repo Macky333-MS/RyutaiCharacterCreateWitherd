@@ -70,7 +70,7 @@
               </div>
               <div class="settings-grid">
                 <section class="setting-card selectable-card">
-                  <div class="card-icon">🎨</div><h3>カラー</h3><p>文字ごとに色を付けます。</p>
+                  <div class="card-icon">🎨</div><h3>カラー</h3><p>ONで文字ごとの色設定を有効にします。OFFでは色設定STEPをスキップします。</p>
                   <button id="colorToggle" class="switch-control selected" type="button" aria-pressed="true"><span class="switch-knob"></span><span class="switch-label">ON</span></button>
                 </section>
                 <section class="setting-card count-card">
@@ -78,8 +78,8 @@
                   <div class="number-stepper"><button id="countDown" type="button" aria-label="1文字減らす">−</button><div id="countDisplay" class="count-display">0</div><button id="countUp" type="button" aria-label="1文字増やす">＋</button></div>
                 </section>
                 <section class="setting-card mode-card">
-                  <div class="card-title-row"><div class="card-icon">✦</div><button id="modeHelp" class="help-button" type="button" aria-label="作成モードの説明">?</button></div><h3>作成モード</h3><p>通常または1文字で作成します。</p>
-                  <div class="segmented-control"><label><input type="radio" name="mode" value="normal" checked><span>通常</span></label><label><input type="radio" name="mode" value="single"><span>1文字</span></label></div>
+                  <div class="card-title-row"><div class="card-icon">✦</div><button id="modeHelp" class="help-button" type="button" aria-label="作成モードの説明">?</button></div><h3>作成モード</h3><p>文字と色を設定する順番を選びます。</p>
+                  <div class="segmented-control"><label><input type="radio" name="mode" value="normal" checked><span>通常</span></label><label><input type="radio" name="mode" value="single"><span>1文字ずつ</span></label></div>
                 </section>
               </div>
               <button id="resonanceButton" class="quiet-feature" type="button"><span>⌁</span> 共鳴練習について</button>
@@ -123,8 +123,9 @@
           <div class="step-page" data-step="6">
             <div class="step-content focused-step color-step">
               <div class="hero-icon icon-color" aria-hidden="true">●</div>
-              <div class="step-copy"><p class="step-kicker">STEP 6</p><h2>色を選択</h2><p>選択中の文字に使う色を選びます。</p></div>
-              <div id="selectedColorLabel" class="selected-color-label">選択中：黒色</div>
+              <div class="step-copy"><p class="step-kicker">STEP 6</p><h2>文字の色を選択</h2><p>対象の文字を確認して、使う色を選びます。通常モードでは文字をタップして対象を変更できます。</p></div>
+              <div id="colorTargetSlots" class="color-target-slots" aria-label="色を設定する文字"></div>
+              <div id="selectedColorLabel" class="selected-color-label">1文字目：黒色</div>
               <div id="paletteColors" class="palette-colors"></div>
             </div>
             <div class="wizard-footer"><button class="ghost-nav" data-prev="5" type="button">← 戻る</button><div></div><button class="primary-nav next-button" data-next="7" type="button">次へ <span>→</span></button></div>
