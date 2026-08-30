@@ -1,0 +1,9 @@
+{
+  "name": "龍体文字作成",
+  "short_name": "龍体文字",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "lang": "ja"
+}
