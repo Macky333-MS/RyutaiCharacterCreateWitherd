@@ -1,7 +1,19 @@
 (() => {
   'use strict';
 
-  const KANA = ['あ','い','う','え','お','か','き','く','け','こ','さ','し','す','せ','そ','た','ち','つ','て','と','な','に','ぬ','ね','の','は','ひ','ふ','へ','ほ','ま','み','む','め','も','や','ゆ','よ','ら','り','る','れ','ろ','わ','を','ん'];
+  const GOJUON_COLUMNS = [
+    { label:'あ行', chars:['あ','い','う','え','お'] },
+    { label:'か行', chars:['か','き','く','け','こ'] },
+    { label:'さ行', chars:['さ','し','す','せ','そ'] },
+    { label:'た行', chars:['た','ち','つ','て','と'] },
+    { label:'な行', chars:['な','に','ぬ','ね','の'] },
+    { label:'は行', chars:['は','ひ','ふ','へ','ほ'] },
+    { label:'ま行', chars:['ま','み','む','め','も'] },
+    { label:'や行', chars:['や','','ゆ','','よ'] },
+    { label:'ら行', chars:['ら','り','る','れ','ろ'] },
+    { label:'わ行', chars:['わ','','','','を'] }
+  ];
+  const GOJUON_ROWS = ['あ段','い段','う段','え段','お段'];
   const COLOR_DATA = [
     ['黒色','#000000'],['水色','#00d7df'],['黄緑色','#9acd32'],['緑色','#00ee00'],['黄色','#ffe600'],['だいだい色','#ffa000'],['ピンク色','#efb0bf'],['赤色','#ff1010'],['紫色','#ef00e8'],['青色','#1111ee'],
     ['茶色','#8b5a3c'],['薄だいだい色','#ffd4ae'],['山吹色','#ffbf00'],['黄土色','#bd9e4c'],['深緑色','#006633'],['群青色','#003171'],['すみれ色','#8c66b3'],['赤紫色','#993366'],['朱色','#e24200'],['こげ茶色','#4d331a'],['ねずみ色','#808080'],['白色','#ffffff'],['銀色','#c0c0c0'],['金色','#d9a621']
@@ -78,6 +90,10 @@
     renderSlots();
     renderPalette();
     renderFinalCharacters();
+    ['toggleAlias1','toggleAlias2'].forEach(id => {
+      const button = $(id);
+      if (button) button.textContent = state.alias ? '仮名表示をOFF' : '仮名表示';
+    });
   }
 
   function renderSlots() {
@@ -92,9 +108,18 @@
       b.className = 'char-slot';
       if (i === selectedSlot) b.classList.add('active-select');
       const n = document.createElement('small'); n.textContent = String(i+1);
+      const char = state.characters[i] || '';
+      if (state.alias && char) {
+        const alias = document.createElement('span');
+        alias.className = 'slot-kana-alias';
+        alias.textContent = char;
+        b.appendChild(alias);
+      }
       const t = document.createElement('span');
-      t.textContent = state.characters[i] || '';
-      t.style.color = state.useColor ? state.colors[i] : '#fff';
+      t.className = 'slot-ryutai-glyph';
+      t.textContent = char;
+      // STEP 3/4では選択済み文字を常に白で表示し、背景とのコントラストを確保する。
+      t.style.color = '#fff';
       b.append(n,t);
       b.disabled = i >= state.count;
       b.style.opacity = i >= state.count ? '.45' : '1';
@@ -268,64 +293,118 @@
   }
 
   function buildKanaGrid() {
-    const grid=$('kanaGrid'); grid.innerHTML='';
-    KANA.forEach(k => {
-      const b=document.createElement('button'); b.type='button'; b.textContent=k;
-      b.addEventListener('click', () => {
-        if (selectedSlot < state.count) {
-          const chosenSlot = selectedSlot;
-          state.characters[chosenSlot] = k;
+    const grid = $('kanaGrid');
+    grid.innerHTML = '';
 
-          if (state.mode === 'single') {
-            if (state.useColor) {
-              // 1文字モード：文字を決めた直後に、その文字の色選択へ移動。
-              selectedSlot = chosenSlot;
-              singleAwaitingColor = true;
-              $('pickerDialog').close();
-              showStep(6);
-              return;
-            }
+    const corner = document.createElement('div');
+    corner.className = 'gojuon-corner';
+    corner.textContent = '段 / 行';
+    grid.appendChild(corner);
 
-            // カラーOFFなら色選択は挟まず、次の文字へそのまま進む。
-            if (chosenSlot >= state.count - 1) {
-              $('pickerDialog').close();
-              showStep(7);
-            } else {
-              selectedSlot = chosenSlot + 1;
-              renderAll();
-              $('pickerTitle').textContent = `${selectedSlot+1}文字目を選択`;
-            }
-            return;
-          }
-
-          // 通常モードは、まず指定文字数分の龍体文字をまとめて選択する。
-          if (selectedSlot < state.count-1) selectedSlot++;
-          renderAll();
-          $('pickerTitle').textContent = `${selectedSlot+1}文字目を選択`;
-        }
-      });
-      grid.appendChild(b);
+    GOJUON_COLUMNS.forEach(column => {
+      const h = document.createElement('div');
+      h.className = 'gojuon-header';
+      h.textContent = column.label;
+      grid.appendChild(h);
     });
+
+    GOJUON_ROWS.forEach((rowLabel, rowIndex) => {
+      const row = document.createElement('div');
+      row.className = 'gojuon-row-label';
+      row.textContent = rowLabel;
+      grid.appendChild(row);
+
+      GOJUON_COLUMNS.forEach(column => {
+        const kana = column.chars[rowIndex];
+        if (!kana) {
+          const empty = document.createElement('div');
+          empty.className = 'gojuon-empty';
+          empty.setAttribute('aria-hidden','true');
+          grid.appendChild(empty);
+          return;
+        }
+        grid.appendChild(createKanaButton(kana));
+      });
+    });
+
+    const nLabel = document.createElement('div');
+    nLabel.className = 'gojuon-row-label gojuon-n-label';
+    nLabel.textContent = '撥音';
+    grid.appendChild(nLabel);
+    grid.appendChild(createKanaButton('ん', true));
+    for (let i=0; i<GOJUON_COLUMNS.length-1; i++) {
+      const empty = document.createElement('div');
+      empty.className = 'gojuon-empty';
+      empty.setAttribute('aria-hidden','true');
+      grid.appendChild(empty);
+    }
   }
 
-  function getPositions(count, layout) {
-    const pos=[];
-    if (!count) return pos;
-    if (layout==='line') {
-      const cols=Math.min(count,10); const rows=count>10?2:1;
-      for(let i=0;i<count;i++) {
-        const row=i<10?0:1; const rowCount=row===0?Math.min(10,count):count-10; const idx=row===0?i:i-10;
-        pos.push({x:((idx+1)/(rowCount+1))*100,y:rows===1?50:(row===0?38:65),r:0});
+  function createKanaButton(kana, isN = false) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'gojuon-kana-button' + (isN ? ' gojuon-n-button' : '');
+    b.setAttribute('aria-label', `${kana}の龍体文字を選択`);
+
+    const reading = document.createElement('span');
+    reading.className = 'picker-kana-reading';
+    reading.textContent = kana;
+
+    const glyph = document.createElement('span');
+    glyph.className = 'picker-ryutai-glyph';
+    glyph.textContent = kana;
+
+    b.append(reading, glyph);
+    b.addEventListener('click', () => chooseKana(kana));
+    return b;
+  }
+
+  function chooseKana(kana) {
+    if (selectedSlot >= state.count) return;
+
+    const chosenSlot = selectedSlot;
+    state.characters[chosenSlot] = kana;
+
+    if (state.mode === 'single') {
+      if (state.useColor) {
+        selectedSlot = chosenSlot;
+        singleAwaitingColor = true;
+        $('pickerDialog').close();
+        showStep(6);
+        return;
       }
-      return pos;
+
+      if (chosenSlot >= state.count - 1) {
+        $('pickerDialog').close();
+        showStep(7);
+      } else {
+        selectedSlot = chosenSlot + 1;
+        renderAll();
+        $('pickerTitle').textContent = `${selectedSlot+1}文字目を選択`;
+      }
+      return;
     }
-    const dir=layout==='right'?1:-1;
-    const start=-Math.PI*.85; const sweep=Math.PI*1.7;
-    for(let i=0;i<count;i++) {
-      const t=count===1?.5:i/(count-1); const a=start+dir*sweep*t;
-      pos.push({x:50+Math.cos(a)*36,y:51+Math.sin(a)*36,r:a*180/Math.PI+90});
+
+    if (selectedSlot < state.count - 1) selectedSlot++;
+    renderAll();
+    $('pickerTitle').textContent = `${selectedSlot+1}文字目を選択`;
+  }
+
+  function toggleKanaAlias() {
+    if (state.alias) {
+      state.alias = false;
+      renderAll();
+      return;
     }
-    return pos;
+
+    showDialog(
+      '仮名表示について',
+      '仮名表示を有効にすると、各龍体文字の上に対応するひらがなを表示します。\n\n龍体文字そのものの形を見て覚える場合は、仮名を表示しない使い方を推奨します。仮名を表示してもよいですか？',
+      [
+        {label:'キャンセル'},
+        {label:'表示する', action:()=>{ state.alias = true; renderAll(); }}
+      ]
+    );
   }
 
   function renderPreview() {
@@ -431,8 +510,8 @@
     $('closePicker').addEventListener('click',()=>$('pickerDialog').close());
     $('clearSlots1').addEventListener('click',()=>{for(let i=0;i<10;i++)state.characters[i]='';renderAll();});
     $('clearSlots2').addEventListener('click',()=>{for(let i=10;i<20;i++)state.characters[i]='';renderAll();});
-    $('toggleAlias1').addEventListener('click',()=>showDialog('仮名表示','試作品では選択ダイアログ内に仮名を直接表示しています。',[{label:'閉じる'}]));
-    $('toggleAlias2').addEventListener('click',()=>showDialog('仮名表示','試作品では選択ダイアログ内に仮名を直接表示しています。',[{label:'閉じる'}]));
+    $('toggleAlias1').addEventListener('click',toggleKanaAlias);
+    $('toggleAlias2').addEventListener('click',toggleKanaAlias);
     qa('.palette-choice').forEach(b=>b.addEventListener('click',()=>{state.palette=Number(b.dataset.palette); const avail=COLOR_DATA.slice(0,state.palette).map(x=>x[1].toLowerCase()); if(!avail.includes(state.selectedColor.toLowerCase()))state.selectedColor='#000000';renderAll();}));
     qa('.shape-button').forEach(b=>b.addEventListener('click',()=>{state.layout=b.dataset.layout;renderAll();}));
     $('previewButton').addEventListener('click',()=>{renderPreview();$('previewDialog').showModal();});

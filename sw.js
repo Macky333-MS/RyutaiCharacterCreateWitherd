@@ -1,11 +1,12 @@
-const CACHE_NAME = 'ryutai-wizard-v3.2';
+const CACHE_NAME = 'ryutai-wizard-v3.3';
 
 const ASSETS = [
   './',
   './index.html',
   './style.css',
   './app.js',
-  './manifest.webmanifest'
+  './manifest.webmanifest',
+  './assets/fonts/pkryutaib3-Regular.otf'
 ];
 
 self.addEventListener('install', event => {

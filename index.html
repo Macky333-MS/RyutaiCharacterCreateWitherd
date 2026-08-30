@@ -170,7 +170,7 @@
   </div>
 
   <dialog id="messageDialog" class="app-dialog"><h3 id="dialogTitle">確認</h3><p id="dialogMessage"></p><div id="dialogButtons" class="dialog-buttons"></div></dialog>
-  <dialog id="pickerDialog" class="app-dialog picker-dialog"><h3 id="pickerTitle">文字選択</h3><p class="dialog-sub">使用する文字をタップしてください。</p><div id="kanaGrid" class="kana-grid"></div><div class="dialog-buttons"><button id="closePicker" type="button">閉じる</button></div></dialog>
+  <dialog id="pickerDialog" class="app-dialog picker-dialog"><h3 id="pickerTitle">文字選択</h3><p class="dialog-sub">50音表を手がかりに、対応する龍体文字を選んでください。各マスの上に通常のひらがな、下に龍体文字を表示しています。</p><div class="gojuon-scroll"><div id="kanaGrid" class="kana-grid" aria-label="50音表から龍体文字を選択"></div></div><div class="dialog-buttons"><button id="closePicker" type="button">閉じる</button></div></dialog>
   <dialog id="previewDialog" class="app-dialog preview-dialog"><h3>完成イメージ</h3><div id="previewCanvas" class="preview-canvas"></div><div class="dialog-buttons"><button id="closePreview" type="button">閉じる</button></div></dialog>
   <canvas id="exportCanvas" width="1200" height="1200" hidden></canvas>
   <script src="app.js"></script>
