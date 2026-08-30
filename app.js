@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  // V3.13: 端末共有に加えて個別保存・ZIP一括保存を追加。Windowsではファイル保存を推奨。
+  // V3.14: Windowsで個別保存・ZIP保存が反応しない問題を修正。File System Access APIを優先利用。
   // 左から「あ」側 → 「わ」側の順に並べ、わ列では「を」を「る」の右隣、
   // 「ん」を「ろ」の右隣に配置する。
   const GOJUON_COLUMNS = [
@@ -803,34 +803,106 @@
     return new Blob([...localParts, ...central, new Uint8Array(end)], {type:'application/zip'});
   }
 
+  async function writeFileToHandle(handle, blob) {
+    const writable = await handle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+  }
+
   async function saveSelectedShareFiles() {
     const button = $('saveShareFiles');
     button.disabled = true;
-    $('shareStatus').textContent = 'ファイルを準備しています…';
+    $('shareStatus').textContent = '保存先を選択してください…';
     try {
+      // Windows の Chrome / Edge では、最初にフォルダーを選択してもらう方式が最も安定します。
+      // ファイル生成より先に picker を開くことで、ユーザー操作の権限が失われるのを防ぎます。
+      let directoryHandle = null;
+      if ('showDirectoryPicker' in window) {
+        try {
+          directoryHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+        } catch (e) {
+          if (e && e.name === 'AbortError') {
+            $('shareStatus').textContent = '保存をキャンセルしました。';
+            return;
+          }
+          throw e;
+        }
+      }
+
+      $('shareStatus').textContent = 'ファイルを準備しています…';
       const {files} = await buildSelectedShareFiles();
-      files.forEach(file => downloadBlob(file, file.name));
-      $('shareStatus').textContent = `${files.length}個のファイルを保存しました。LINEなどへ添付して使用できます。`;
+
+      if (directoryHandle) {
+        for (const file of files) {
+          const handle = await directoryHandle.getFileHandle(file.name, { create: true });
+          await writeFileToHandle(handle, file);
+        }
+        $('shareStatus').textContent = `${files.length}個のファイルを選択したフォルダーへ保存しました。`;
+      } else {
+        // Safari / Firefox など File System Access API 非対応ブラウザ向け。
+        // 複数ダウンロードをブラウザが制限する場合があるため、少し間隔を空けます。
+        for (let i = 0; i < files.length; i++) {
+          downloadBlob(files[i], files[i].name);
+          if (i < files.length - 1) await new Promise(resolve => setTimeout(resolve, 350));
+        }
+        $('shareStatus').textContent = `${files.length}個のファイルのダウンロードを開始しました。ブラウザから複数ダウンロードの許可を求められた場合は許可してください。`;
+      }
     } catch (e) {
       console.error(e);
-      $('shareStatus').textContent = e.message || 'ファイルの保存に失敗しました。';
-    } finally { button.disabled = false; }
+      $('shareStatus').textContent = `個別保存に失敗しました：${e.message || e.name || '不明なエラー'}`;
+    } finally {
+      button.disabled = false;
+    }
   }
 
   async function saveSelectedShareZip() {
     const button = $('saveShareZip');
     button.disabled = true;
-    $('shareStatus').textContent = 'ZIPファイルを準備しています…';
+    $('shareStatus').textContent = '保存先を選択してください…';
     try {
-      const {r, files} = await buildSelectedShareFiles();
+      if (!selectedHistoryId) throw new Error('保存データが選択されていません。');
+      const selectedRecord = await storeGet(selectedHistoryId);
+      if (!selectedRecord) throw new Error('保存データを読み込めませんでした。');
+      const zipName = `Ryutai_${sanitizeFile(selectedRecord.itemName)}_${Date.now()}.zip`;
+
+      // ZIP は Save As ダイアログを最初に開く。生成処理の await 後に開くと、
+      // Windows ブラウザでユーザー操作と認識されず無反応になる場合があるため。
+      let fileHandle = null;
+      if ('showSaveFilePicker' in window) {
+        try {
+          fileHandle = await window.showSaveFilePicker({
+            suggestedName: zipName,
+            types: [{
+              description: 'ZIP archive',
+              accept: { 'application/zip': ['.zip'] }
+            }]
+          });
+        } catch (e) {
+          if (e && e.name === 'AbortError') {
+            $('shareStatus').textContent = '保存をキャンセルしました。';
+            return;
+          }
+          throw e;
+        }
+      }
+
+      $('shareStatus').textContent = 'ZIPファイルを作成しています…';
+      const {files} = await buildSelectedShareFiles();
       const blob = await buildZipBlob(files);
-      const name = `Ryutai_${sanitizeFile(r.itemName)}_${Date.now()}.zip`;
-      downloadBlob(blob, name);
-      $('shareStatus').textContent = '選択したデータを1つのZIPファイルにまとめて保存しました。';
+
+      if (fileHandle) {
+        await writeFileToHandle(fileHandle, blob);
+        $('shareStatus').textContent = '選択したデータをZIPファイルとして保存しました。';
+      } else {
+        downloadBlob(blob, zipName);
+        $('shareStatus').textContent = 'ZIPファイルのダウンロードを開始しました。';
+      }
     } catch (e) {
       console.error(e);
-      $('shareStatus').textContent = e.message || 'ZIPファイルの作成に失敗しました。';
-    } finally { button.disabled = false; }
+      $('shareStatus').textContent = `ZIP保存に失敗しました：${e.message || e.name || '不明なエラー'}`;
+    } finally {
+      button.disabled = false;
+    }
   }
 
   async function openShareDialog() {
