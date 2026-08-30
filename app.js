@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  // V3.6: 共鳴練習画面を追加。文字表・作成フローはV3.5を継承する。
+  // V3.8: STEP6の文字ごとの色設定をSTEP7へ引き継ぎ、最終表示・プレビューに反映。
   // 左から「あ」側 → 「わ」側の順に並べ、わ列では「を」を「る」の右隣、
   // 「ん」を「ろ」の右隣に配置する。
   const GOJUON_COLUMNS = [
@@ -35,9 +35,9 @@
     useColor: true,
     mode: 'normal',
     palette: 10,
-    selectedColor: '#000000',
+    selectedColor: '#ffffff',
     characters: Array(20).fill(''),
-    colors: Array(20).fill('#000000'),
+    colors: Array(20).fill('#ffffff'),
     layout: 'line',
     alias: false
   });
@@ -151,7 +151,7 @@
         b.className = 'color-target-slot';
         if (i === selectedSlot) b.classList.add('selected');
         b.innerHTML = `<small>${i+1}</small><span>${escapeHtml(state.characters[i] || '□')}</span>`;
-        b.style.color = state.colors[i] || '#000000';
+        b.style.color = state.colors[i] || '#ffffff';
         b.addEventListener('click', () => { selectedSlot = i; renderPalette(); });
         targetWrap.appendChild(b);
       }
@@ -185,7 +185,7 @@
       });
       wrap.appendChild(b);
     });
-    const currentHex = state.colors[selectedSlot] || state.selectedColor;
+    const currentHex = state.colors[selectedSlot] || '#ffffff';
     const found = COLOR_DATA.find(x => x[1].toLowerCase() === currentHex.toLowerCase());
     $('selectedColorLabel').textContent = `${selectedSlot+1}文字目：${found ? found[0] : currentHex}`;
   }
@@ -193,7 +193,7 @@
   function renderFinalCharacters() {
     const wrap = $('finalCharacters'); wrap.innerHTML='';
     for (let i=0; i<state.count; i++) {
-      const s=document.createElement('span'); s.textContent=state.characters[i] || '□'; s.style.color=state.useColor ? state.colors[i] : '#fff'; wrap.appendChild(s);
+      const s=document.createElement('span'); s.textContent=state.characters[i] || '□'; s.style.color=state.useColor ? (state.colors[i] || '#ffffff') : '#ffffff'; wrap.appendChild(s);
     }
   }
 
@@ -504,7 +504,7 @@
     for(let i=0;i<state.count;i++) {
       if(!state.characters[i]) continue;
       const s=document.createElement('span'); s.className='preview-char'; s.textContent=state.characters[i];
-      s.style.left=`${p[i].x}%`; s.style.top=`${p[i].y}%`; s.style.color=state.useColor?state.colors[i]:'#000';
+      s.style.left=`${p[i].x}%`; s.style.top=`${p[i].y}%`; s.style.color=state.useColor ? (state.colors[i] || '#ffffff') : '#ffffff';
       if(state.layout!=='line') s.style.transform=`translate(-50%,-50%) rotate(${p[i].r}deg)`;
       wrap.appendChild(s);
     }
@@ -562,7 +562,7 @@
   }
 
   function applyRecordToState(r, duplicate=false) {
-    state=freshState(); state.editingId=duplicate?null:r.id; state.itemName=duplicate?`${r.itemName}（複製）`:r.itemName; state.count=r.count; state.useColor=r.useColor; state.mode=r.mode||'normal'; state.palette=r.palette||10; state.characters=[...r.characters,...Array(20).fill('')].slice(0,20); state.colors=[...r.colors,...Array(20).fill('#000')].slice(0,20); state.layout=r.layout||'line'; state.selectedColor=state.colors[0]||'#000'; selectedSlot=0;
+    state=freshState(); state.editingId=duplicate?null:r.id; state.itemName=duplicate?`${r.itemName}（複製）`:r.itemName; state.count=r.count; state.useColor=r.useColor; state.mode=r.mode||'normal'; state.palette=r.palette||10; state.characters=[...r.characters,...Array(20).fill('')].slice(0,20); state.colors=[...r.colors,...Array(20).fill('#ffffff')].slice(0,20); state.layout=r.layout||'line'; state.selectedColor=state.colors[0]||'#ffffff'; selectedSlot=0;
     showView('createView'); showStep(1);
   }
 
