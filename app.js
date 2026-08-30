@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  // V3.8: STEP6の文字ごとの色設定をSTEP7へ引き継ぎ、最終表示・プレビューに反映。
+  // V3.9: STEP7プレビュー/画像保存を修復し、履歴詳細・CSV・Word出力を追加。
   // 左から「あ」側 → 「わ」側の順に並べ、わ列では「を」を「る」の右隣、
   // 「ん」を「ろ」の右隣に配置する。
   const GOJUON_COLUMNS = [
@@ -498,6 +498,50 @@
     });
   }
 
+  function getPositions(count, layout) {
+    const n = Math.max(0, Number(count) || 0);
+    const positions = [];
+    if (!n) return positions;
+
+    if (layout === 'line') {
+      // 10文字までは1段、11〜20文字は2段に分ける。
+      const firstCount = Math.min(n, 10);
+      const secondCount = Math.max(0, n - 10);
+      const pushLine = (amount, startIndex, y) => {
+        if (!amount) return;
+        const left = amount === 1 ? 50 : 12;
+        const right = amount === 1 ? 50 : 88;
+        for (let i = 0; i < amount; i++) {
+          const t = amount === 1 ? 0.5 : i / (amount - 1);
+          positions[startIndex + i] = { x: left + (right - left) * t, y, r: 0 };
+        }
+      };
+      pushLine(firstCount, 0, secondCount ? 40 : 50);
+      pushLine(secondCount, 10, 60);
+      return positions;
+    }
+
+    // 右回り / 左回りは、同じ弧を左右反転させて配置する。
+    const direction = layout === 'left' ? -1 : 1;
+    const startDeg = -125;
+    const endDeg = 125;
+    const cx = 50;
+    const cy = 51;
+    const radiusX = n <= 10 ? 34 : 39;
+    const radiusY = n <= 10 ? 34 : 39;
+    for (let i = 0; i < n; i++) {
+      const t = n === 1 ? 0.5 : i / (n - 1);
+      const deg = startDeg + (endDeg - startDeg) * t;
+      const rad = deg * Math.PI / 180;
+      const x = cx + direction * radiusX * Math.cos(rad);
+      const y = cy + radiusY * Math.sin(rad);
+      // 文字が弧に沿う程度の回転。左右回りで向きを反転する。
+      const r = direction * (deg + 90);
+      positions.push({ x, y, r });
+    }
+    return positions;
+  }
+
   function renderPreview() {
     const wrap=$('previewCanvas'); wrap.innerHTML='';
     const p=getPositions(state.count,state.layout);
@@ -554,7 +598,17 @@
   async function selectHistory(id) {
     selectedHistoryId=id; const r=await storeGet(id); if(!r)return;
     $('historyDetail').classList.remove('empty-detail');
-    $('historyDetail').innerHTML=`<div>日付：<br>${formatDate(new Date(r.updatedAt),true)}</div><div>項目名：<br>${escapeHtml(r.itemName)}</div><div>龍体文字：</div><div class="detail-ryutai">${r.characters.map((c,i)=>`<span style="color:${r.useColor?r.colors[i]:'#fff'}">${escapeHtml(c)}</span>`).join('')}</div><div>形状：${layoutLabel(r.layout)}</div>`;
+    const charRows = r.characters.map((c,i) => {
+      const hex = normalizeHex(r.useColor ? r.colors[i] : '#ffffff');
+      return `<tr><td>${i+1}</td><td class="history-glyph" style="color:${hex}">${escapeHtml(c)}</td><td>${escapeHtml(c)}</td><td><code>${hex}</code></td></tr>`;
+    }).join('');
+    $('historyDetail').innerHTML=`
+      <div class="detail-summary"><div>日付：<br>${formatDate(new Date(r.updatedAt),true)}</div><div>項目名：<br>${escapeHtml(r.itemName)}</div></div>
+      <div>龍体文字：</div>
+      <div class="detail-ryutai">${r.characters.map((c,i)=>`<span style="color:${normalizeHex(r.useColor?r.colors[i]:'#ffffff')}">${escapeHtml(c)}</span>`).join('')}</div>
+      <div>形状：${layoutLabel(r.layout)}</div>
+      <div class="detail-data-title">文字・HEXコード</div>
+      <div class="detail-table-wrap"><table class="detail-data-table"><thead><tr><th>No.</th><th>龍体文字</th><th>対応するひらがな</th><th>HEX</th></tr></thead><tbody>${charRows}</tbody></table></div>`;
     $('historyActions').classList.remove('hidden');
     $('favoriteHistory').textContent=r.favorite?'★ お気に入り解除':'☆ お気に入り';
     document.querySelector('.history-layout').classList.add('detail-open');
@@ -569,11 +623,94 @@
   async function toggleFavorite(){ if(!selectedHistoryId)return; const r=await storeGet(selectedHistoryId); r.favorite=!r.favorite; r.updatedAt=new Date().toISOString(); await storePut(r); await selectHistory(r.id); }
   async function deleteSelected(){ if(!selectedHistoryId)return; showDialog('削除確認','この保存データを削除しますか？\nこの操作は元に戻せません。',[{label:'キャンセル'},{label:'削除',action:async()=>{await storeDelete(selectedHistoryId);selectedHistoryId=null;$('historyDetail').textContent='左の保存データを選択してください。';$('historyDetail').classList.add('empty-detail');$('historyActions').classList.add('hidden');document.querySelector('.history-layout').classList.remove('detail-open');await renderHistory();}}]); }
 
-  async function saveImageSelected(){ if(!selectedHistoryId)return; const r=await storeGet(selectedHistoryId); drawExport(r); const canvas=$('exportCanvas'); const link=document.createElement('a'); link.download=`Ryutai_${sanitizeFile(r.itemName)}_${Date.now()}.png`; link.href=canvas.toDataURL('image/png'); link.click(); }
+  async function ensureRyutaiFontReady() {
+    if (!document.fonts) return;
+    try {
+      await document.fonts.load('96px RyutaiWeb', 'あいうえお');
+      await document.fonts.ready;
+    } catch (e) {
+      console.warn('龍体文字フォントの読み込み確認に失敗しました。', e);
+    }
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    setTimeout(() => { URL.revokeObjectURL(url); link.remove(); }, 1500);
+  }
+
+  async function saveImageSelected(){
+    if(!selectedHistoryId)return;
+    const r=await storeGet(selectedHistoryId);
+    await ensureRyutaiFontReady();
+    drawExport(r);
+    const canvas=$('exportCanvas');
+    const filename=`Ryutai_${sanitizeFile(r.itemName)}_${Date.now()}.png`;
+    if (canvas.toBlob) {
+      canvas.toBlob(blob => {
+        if (blob) downloadBlob(blob, filename);
+        else showDialog('画像保存','画像データを作成できませんでした。',[{label:'閉じる'}]);
+      }, 'image/png');
+    } else {
+      const link=document.createElement('a'); link.download=filename; link.href=canvas.toDataURL('image/png'); link.click();
+    }
+  }
+
   function drawExport(r){
-    const c=$('exportCanvas'),ctx=c.getContext('2d'); ctx.clearRect(0,0,c.width,c.height); ctx.fillStyle='#fff'; ctx.fillRect(0,0,c.width,c.height);
-    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='96px RyutaiWeb, sans-serif'; const p=getPositions(r.count,r.layout);
-    for(let i=0;i<r.count;i++){ const x=p[i].x/100*c.width,y=p[i].y/100*c.height; ctx.save();ctx.translate(x,y); if(r.layout!=='line')ctx.rotate(p[i].r*Math.PI/180); ctx.fillStyle=r.useColor?r.colors[i]:'#000';ctx.fillText(r.characters[i]||'',0,0);ctx.restore(); }
+    const c=$('exportCanvas'),ctx=c.getContext('2d');
+    ctx.clearRect(0,0,c.width,c.height);
+    // アプリ表示と同様に濃色背景にすることで、白文字も見えるようにする。
+    ctx.fillStyle='#111318'; ctx.fillRect(0,0,c.width,c.height);
+    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='96px RyutaiWeb, pkryutaib3, sans-serif';
+    const p=getPositions(r.count,r.layout);
+    for(let i=0;i<r.count;i++){
+      if (!p[i]) continue;
+      const x=p[i].x/100*c.width,y=p[i].y/100*c.height;
+      ctx.save();ctx.translate(x,y);
+      if(r.layout!=='line')ctx.rotate(p[i].r*Math.PI/180);
+      ctx.fillStyle=normalizeHex(r.useColor?r.colors[i]:'#ffffff');
+      ctx.fillText(r.characters[i]||'',0,0);ctx.restore();
+    }
+  }
+
+  async function saveCsvSelected() {
+    if (!selectedHistoryId) return;
+    const r = await storeGet(selectedHistoryId);
+    const chars = r.characters.map(csvCell).join(',');
+    const hexes = r.characters.map((_,i) => csvCell(normalizeHex(r.useColor ? r.colors[i] : '#ffffff'))).join(',');
+    // 1行目=対応するひらがな、2行目=HEX。Excelで各文字が1列ずつ対応する。
+    const csv = '\ufeff' + chars + '\r\n' + hexes + '\r\n';
+    downloadBlob(new Blob([csv], {type:'text/csv;charset=utf-8'}), `Ryutai_${sanitizeFile(r.itemName)}_${Date.now()}.csv`);
+  }
+
+  async function saveWordSelected() {
+    if (!selectedHistoryId) return;
+    const r = await storeGet(selectedHistoryId);
+    // Wordで開けるHTML形式の.doc。龍体文字は編集可能な文字として保持する。
+    // Word側でも同じ字形にするには pkryutaib3 フォントのインストールが必要。
+    const runs = r.characters.map((c,i) => {
+      const color = normalizeHex(r.useColor ? r.colors[i] : '#ffffff');
+      return `<span style="font-family:'pkryutaib3','RyutaiWeb';font-size:54pt;color:${color};margin-right:6pt;">${escapeHtml(c)}</span>`;
+    }).join('');
+    const rows = r.characters.map((c,i) => `<tr><td>${i+1}</td><td>${escapeHtml(c)}</td><td>${normalizeHex(r.useColor ? r.colors[i] : '#ffffff')}</td></tr>`).join('');
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(r.itemName)}</title><style>body{font-family:'Yu Gothic','Meiryo',sans-serif;color:#111} .ryutai-box{background:#111318;padding:28pt;border-radius:10pt;margin:18pt 0;line-height:1.8} table{border-collapse:collapse;margin-top:18pt}th,td{border:1px solid #999;padding:6pt 10pt;text-align:center}h1{font-size:20pt}</style></head><body><h1>${escapeHtml(r.itemName)}</h1><p>形状：${layoutLabel(r.layout)}</p><div class="ryutai-box">${runs}</div><table><thead><tr><th>No.</th><th>対応するひらがな</th><th>HEX</th></tr></thead><tbody>${rows}</tbody></table><p style="font-size:9pt;color:#666">※龍体文字を同じ字形で表示・編集するには、Wordを開く端末に「pkryutaib3」フォントをインストールしてください。</p></body></html>`;
+    downloadBlob(new Blob(['\ufeff', html], {type:'application/msword;charset=utf-8'}), `Ryutai_${sanitizeFile(r.itemName)}_${Date.now()}.doc`);
+  }
+
+  function csvCell(value) {
+    return `"${String(value ?? '').replace(/"/g,'""')}"`;
+  }
+
+  function normalizeHex(value) {
+    const v = String(value || '#ffffff').trim();
+    if (/^#[0-9a-f]{6}$/i.test(v)) return v.toUpperCase();
+    if (/^#[0-9a-f]{3}$/i.test(v)) return ('#' + v.slice(1).split('').map(c=>c+c).join('')).toUpperCase();
+    return '#FFFFFF';
   }
 
   function layoutLabel(v){return v==='right'?'右回り':v==='left'?'左回り':'直線';}
@@ -631,6 +768,8 @@
     $('editHistory').addEventListener('click',async()=>{const r=await storeGet(selectedHistoryId);applyRecordToState(r,false);});
     $('duplicateHistory').addEventListener('click',async()=>{const r=await storeGet(selectedHistoryId);applyRecordToState(r,true);});
     $('saveImageHistory').addEventListener('click',saveImageSelected);
+    $('saveCsvHistory').addEventListener('click',saveCsvSelected);
+    $('saveWordHistory').addEventListener('click',saveWordSelected);
     $('deleteHistory').addEventListener('click',deleteSelected);
   }
 
