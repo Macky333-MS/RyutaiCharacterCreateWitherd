@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#111318" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>龍体文字作成 Web V3.12</title>
+  <title>龍体文字作成 Web V3.13</title>
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -200,16 +200,16 @@
 
   <dialog id="shareDialog" class="app-dialog share-dialog">
     <h3>共有するデータを選択</h3>
-    <p class="dialog-sub">1つ以上選択してください。共有先はスマホ・パソコンの共有メニューから選べます。</p>
+    <p class="dialog-sub">1つ以上選択してください。スマホでは端末の共有機能、Windowsではファイル保存またはZIP保存が安定しています。</p>
     <div class="share-choice-list">
       <label class="share-choice"><input id="shareImageChoice" type="checkbox" checked><span><strong>画像</strong><small>完成した龍体文字をPNGで共有</small></span></label>
       <label class="share-choice"><input id="shareCsvChoice" type="checkbox"><span><strong>CSV</strong><small>各文字とHEXコードを共有</small></span></label>
       <label class="share-choice"><input id="shareWordChoice" type="checkbox"><span><strong>Word</strong><small>色付き龍体文字をWord形式で共有</small></span></label>
     </div>
     <p id="shareStatus" class="share-status" aria-live="polite"></p>
-    <div class="dialog-buttons"><button id="closeShare" type="button">閉じる</button><button id="executeShare" class="primary-dialog-action" type="button">共有する</button></div>
+    <div class="share-help">Windowsでは共有先アプリが表示されない場合があります。その場合は「個別保存」または「ZIP保存」を使い、LINE・メール・Discordなどへ添付してください。</div><div class="dialog-buttons share-actions"><button id="closeShare" type="button">閉じる</button><button id="saveShareFiles" type="button">個別保存</button><button id="saveShareZip" type="button">ZIP保存</button><button id="executeShare" class="primary-dialog-action" type="button">端末で共有</button></div>
   </dialog>
-  <div class="version-badge" aria-label="アプリのバージョン">Version 3.12</div>
+  <div class="version-badge" aria-label="アプリのバージョン">Version 3.13</div>
   <canvas id="exportCanvas" width="1200" height="1200" hidden></canvas>
   <script src="app.js"></script>
 </body>

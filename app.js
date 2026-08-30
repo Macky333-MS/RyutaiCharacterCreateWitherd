@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  // V3.12: 保存データから画像・CSV・Wordを複数選択して端末の共有メニューへ渡せる共有機能を追加。
+  // V3.13: 端末共有に加えて個別保存・ZIP一括保存を追加。Windowsではファイル保存を推奨。
   // 左から「あ」側 → 「わ」側の順に並べ、わ列では「を」を「る」の右隣、
   // 「ん」を「ろ」の右隣に配置する。
   const GOJUON_COLUMNS = [
@@ -730,6 +730,109 @@
     return new File(['\ufeff', html], `Ryutai_${sanitizeFile(r.itemName)}_${Date.now()}.doc`, {type:'application/msword;charset=utf-8'});
   }
 
+
+  function getSelectedShareTypes() {
+    return {
+      image: $('shareImageChoice').checked,
+      csv: $('shareCsvChoice').checked,
+      word: $('shareWordChoice').checked
+    };
+  }
+
+  async function buildSelectedShareFiles() {
+    if (!selectedHistoryId) throw new Error('保存データが選択されていません。');
+    const types = getSelectedShareTypes();
+    if (!types.image && !types.csv && !types.word) throw new Error('共有するデータを1つ以上選択してください。');
+    const r = await storeGet(selectedHistoryId);
+    const files = [];
+    if (types.image) files.push(await buildImageFile(r));
+    if (types.csv) files.push(buildCsvFile(r));
+    if (types.word) files.push(buildWordFile(r));
+    return {r, files};
+  }
+
+  function crc32(bytes) {
+    let crc = 0xffffffff;
+    for (let i = 0; i < bytes.length; i++) {
+      crc ^= bytes[i];
+      for (let j = 0; j < 8; j++) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+    }
+    return (crc ^ 0xffffffff) >>> 0;
+  }
+
+  function zipDosDateTime(date) {
+    const year = Math.max(1980, date.getFullYear());
+    const time = ((date.getHours() & 31) << 11) | ((date.getMinutes() & 63) << 5) | ((Math.floor(date.getSeconds() / 2)) & 31);
+    const day = date.getDate();
+    const month = date.getMonth() + 1;
+    const dosDate = (((year - 1980) & 127) << 9) | ((month & 15) << 5) | (day & 31);
+    return {time, date: dosDate};
+  }
+
+  function writeU16(arr, value) { arr.push(value & 255, (value >>> 8) & 255); }
+  function writeU32(arr, value) { arr.push(value & 255, (value >>> 8) & 255, (value >>> 16) & 255, (value >>> 24) & 255); }
+
+  async function buildZipBlob(files) {
+    const encoder = new TextEncoder();
+    const localParts = [];
+    const central = [];
+    let offset = 0;
+    for (const file of files) {
+      const nameBytes = encoder.encode(file.name);
+      const data = new Uint8Array(await file.arrayBuffer());
+      const crc = crc32(data);
+      const dt = zipDosDateTime(new Date());
+      const local = [];
+      writeU32(local, 0x04034b50); writeU16(local, 20); writeU16(local, 0x0800); writeU16(local, 0);
+      writeU16(local, dt.time); writeU16(local, dt.date); writeU32(local, crc); writeU32(local, data.length); writeU32(local, data.length);
+      writeU16(local, nameBytes.length); writeU16(local, 0);
+      const localHeader = new Uint8Array([...local, ...nameBytes]);
+      localParts.push(localHeader, data);
+
+      const cen = [];
+      writeU32(cen, 0x02014b50); writeU16(cen, 20); writeU16(cen, 20); writeU16(cen, 0x0800); writeU16(cen, 0);
+      writeU16(cen, dt.time); writeU16(cen, dt.date); writeU32(cen, crc); writeU32(cen, data.length); writeU32(cen, data.length);
+      writeU16(cen, nameBytes.length); writeU16(cen, 0); writeU16(cen, 0); writeU16(cen, 0); writeU16(cen, 0); writeU32(cen, 0); writeU32(cen, offset);
+      central.push(new Uint8Array([...cen, ...nameBytes]));
+      offset += localHeader.length + data.length;
+    }
+    const centralSize = central.reduce((n, p) => n + p.length, 0);
+    const end = [];
+    writeU32(end, 0x06054b50); writeU16(end, 0); writeU16(end, 0); writeU16(end, files.length); writeU16(end, files.length);
+    writeU32(end, centralSize); writeU32(end, offset); writeU16(end, 0);
+    return new Blob([...localParts, ...central, new Uint8Array(end)], {type:'application/zip'});
+  }
+
+  async function saveSelectedShareFiles() {
+    const button = $('saveShareFiles');
+    button.disabled = true;
+    $('shareStatus').textContent = 'ファイルを準備しています…';
+    try {
+      const {files} = await buildSelectedShareFiles();
+      files.forEach(file => downloadBlob(file, file.name));
+      $('shareStatus').textContent = `${files.length}個のファイルを保存しました。LINEなどへ添付して使用できます。`;
+    } catch (e) {
+      console.error(e);
+      $('shareStatus').textContent = e.message || 'ファイルの保存に失敗しました。';
+    } finally { button.disabled = false; }
+  }
+
+  async function saveSelectedShareZip() {
+    const button = $('saveShareZip');
+    button.disabled = true;
+    $('shareStatus').textContent = 'ZIPファイルを準備しています…';
+    try {
+      const {r, files} = await buildSelectedShareFiles();
+      const blob = await buildZipBlob(files);
+      const name = `Ryutai_${sanitizeFile(r.itemName)}_${Date.now()}.zip`;
+      downloadBlob(blob, name);
+      $('shareStatus').textContent = '選択したデータを1つのZIPファイルにまとめて保存しました。';
+    } catch (e) {
+      console.error(e);
+      $('shareStatus').textContent = e.message || 'ZIPファイルの作成に失敗しました。';
+    } finally { button.disabled = false; }
+  }
+
   async function openShareDialog() {
     if (!selectedHistoryId) return;
     $('shareStatus').textContent = '';
@@ -741,51 +844,27 @@
 
   async function executeShareSelected() {
     if (!selectedHistoryId) return;
-    const wantImage = $('shareImageChoice').checked;
-    const wantCsv = $('shareCsvChoice').checked;
-    const wantWord = $('shareWordChoice').checked;
-    if (!wantImage && !wantCsv && !wantWord) {
-      $('shareStatus').textContent = '共有するデータを1つ以上選択してください。';
-      return;
-    }
     const button = $('executeShare');
     const oldLabel = button.textContent;
     button.disabled = true;
     button.textContent = '準備中…';
     $('shareStatus').textContent = '';
     try {
-      const r = await storeGet(selectedHistoryId);
-      const files = [];
-      if (wantImage) files.push(await buildImageFile(r));
-      if (wantCsv) files.push(buildCsvFile(r));
-      if (wantWord) files.push(buildWordFile(r));
-
-      const shareData = {
-        title: `龍体文字：${r.itemName}`,
-        text: `「${r.itemName}」の龍体文字データです。`,
-        files
-      };
-      const fileShareSupported = !!(navigator.share && (!navigator.canShare || navigator.canShare({files})));
-      if (fileShareSupported) {
-        await navigator.share(shareData);
-        $('shareDialog').close();
+      const {r, files} = await buildSelectedShareFiles();
+      if (!navigator.share) {
+        $('shareStatus').textContent = 'このブラウザでは端末の共有機能を利用できません。「個別保存」または「ZIP保存」を使用してください。';
         return;
       }
-
-      // ブラウザがファイル共有に未対応の場合は、選択ファイルを端末へ保存する。
-      files.forEach(file => downloadBlob(file, file.name));
-      $('shareStatus').textContent = 'このブラウザはファイル共有に対応していないため、選択したファイルを保存しました。保存したファイルをLINEなどから添付してください。';
-    } catch (e) {
-      if (e && e.name === 'AbortError') {
-        $('shareStatus').textContent = '共有をキャンセルしました。';
-      } else {
-        console.error(e);
-        $('shareStatus').textContent = '共有データの作成に失敗しました。もう一度お試しください。';
+      if (navigator.canShare && !navigator.canShare({files})) {
+        $('shareStatus').textContent = 'このブラウザでは選択したファイルを共有画面へ渡せません。「個別保存」または「ZIP保存」を使用してください。';
+        return;
       }
-    } finally {
-      button.disabled = false;
-      button.textContent = oldLabel;
-    }
+      await navigator.share({title:`龍体文字：${r.itemName}`, text:`「${r.itemName}」の龍体文字データです。`, files});
+      $('shareDialog').close();
+    } catch (e) {
+      if (e && e.name === 'AbortError') $('shareStatus').textContent = '共有をキャンセルしました。';
+      else { console.error(e); $('shareStatus').textContent = e.message || '端末の共有機能を利用できませんでした。「個別保存」または「ZIP保存」をお試しください。'; }
+    } finally { button.disabled = false; button.textContent = oldLabel; }
   }
 
   async function saveImageSelected(){
@@ -902,6 +981,8 @@
     $('shareHistory').addEventListener('click',openShareDialog);
     $('closeShare').addEventListener('click',()=>$('shareDialog').close());
     $('executeShare').addEventListener('click',executeShareSelected);
+    $('saveShareFiles').addEventListener('click',saveSelectedShareFiles);
+    $('saveShareZip').addEventListener('click',saveSelectedShareZip);
     $('deleteHistory').addEventListener('click',deleteSelected);
   }
 

@@ -175,3 +175,5 @@
 .share-choice small{font-size:13px;color:#667080;line-height:1.45}
 .share-status{min-height:1.5em;margin:4px 0 0;color:#5a6473;font-size:14px}
 @media(max-width:640px){.share-choice{padding:13px}.history-actions .share-action{flex:1 1 100%}}
+
+.share-help{margin:12px 0 4px;padding:11px 13px;border-radius:12px;background:#eef2f7;color:#4f5b6b;font-size:13px;line-height:1.55}.share-actions{flex-wrap:wrap}.share-actions button{min-width:110px}@media(max-width:640px){.share-actions button{flex:1 1 calc(50% - 8px)}.share-actions .primary-dialog-action{flex-basis:100%}}
