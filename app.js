@@ -612,6 +612,28 @@
     });
     if(!all.length){list.innerHTML='<div style="padding:24px;color:#777;text-align:center">保存データはありません。</div>';}
   }
+  function renderHistoryShapePreview(record) {
+    const wrap = $('historyShapePreview');
+    if (!wrap || !record) return;
+    wrap.innerHTML = '';
+    const count = Math.min(Number(record.count) || 0, Array.isArray(record.characters) ? record.characters.length : 0);
+    const positions = getPositions(count, record.layout || 'line');
+    for (let i = 0; i < count; i++) {
+      const ch = record.characters[i];
+      const pos = positions[i];
+      if (!ch || !pos) continue;
+      const glyph = document.createElement('span');
+      glyph.className = 'history-preview-char';
+      glyph.textContent = ch;
+      glyph.style.left = `${pos.x}%`;
+      glyph.style.top = `${pos.y}%`;
+      glyph.style.color = normalizeHex(record.useColor ? (record.colors?.[i] || '#ffffff') : '#ffffff');
+      const rotation = record.layout === 'line' ? 0 : (pos.r || 0);
+      glyph.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
+      wrap.appendChild(glyph);
+    }
+  }
+
   async function selectHistory(id) {
     selectedHistoryId=id; const r=await storeGet(id); if(!r)return;
     $('historyDetail').classList.remove('empty-detail');
@@ -624,8 +646,13 @@
       <div>龍体文字：</div>
       <div class="detail-ryutai">${r.characters.map((c,i)=>`<span style="color:${normalizeHex(r.useColor?r.colors[i]:'#ffffff')}">${escapeHtml(c)}</span>`).join('')}</div>
       <div>形状：${layoutLabel(r.layout)}</div>
+      <section class="detail-preview-section">
+        <h3>保存した龍体文字のプレビュー</h3>
+        <div id="historyShapePreview" class="history-shape-preview" aria-label="保存した龍体文字の形状プレビュー"></div>
+      </section>
       <div class="detail-data-title">文字・HEXコード</div>
       <div class="detail-table-wrap"><table class="detail-data-table"><thead><tr><th>No.</th><th>龍体文字</th><th>対応するひらがな</th><th>HEX</th></tr></thead><tbody>${charRows}</tbody></table></div>`;
+    renderHistoryShapePreview(r);
     $('historyActions').classList.remove('hidden');
     $('favoriteHistory').textContent=r.favorite?'★ お気に入り解除':'☆ お気に入り';
     document.querySelector('.history-layout').classList.add('detail-open');
@@ -682,7 +709,7 @@
     const c=$('exportCanvas'),ctx=c.getContext('2d');
     ctx.clearRect(0,0,c.width,c.height);
     // 黒文字・白文字のどちらも判別しやすい中間グレー背景。
-    ctx.fillStyle='#7A7F87'; ctx.fillRect(0,0,c.width,c.height);
+    ctx.fillStyle='#777777'; ctx.fillRect(0,0,c.width,c.height);
     ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='96px RyutaiWeb, pkryutaib3, sans-serif';
     const p=getPositions(r.count,r.layout);
     for(let i=0;i<r.count;i++){
