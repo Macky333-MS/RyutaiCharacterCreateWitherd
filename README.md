@@ -39,3 +39,8 @@ IndexedDB・PWAを安定して確認する場合はGitHub Pages等のHTTP/HTTPS�
 - 複製
 - お気に入り
 - PNG出力
+
+## v3.1 キャッシュ更新について
+GitHub Pagesで旧バージョンが表示され続ける問題を軽減するため、`sw.js` を更新しています。
+新しいService Workerが有効になると旧キャッシュを削除し、ページ本体はネットワーク上の最新版を優先して取得します。
+初回だけ旧Service Workerが残っている場合は、ブラウザのサイトデータ削除またはService WorkerのUnregister後に再読み込みしてください。
